@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:text="Hello World!" />
 
-    <TextureView
+    <com.numericcal.androidsensors.AutoFitTextureView
         android:id="@+id/camView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

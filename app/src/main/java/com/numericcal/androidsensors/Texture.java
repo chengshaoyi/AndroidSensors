@@ -1,20 +1,22 @@
 package com.numericcal.androidsensors;
 
+import android.app.Activity;
 import android.graphics.SurfaceTexture;
-import android.os.Handler;
-import android.view.SurfaceView;
+import android.util.Log;
 import android.view.TextureView;
 
 import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
+import io.reactivex.subjects.PublishSubject;
 
 public class Texture {
+    private static final String TAG = "AS.Texture";
+
     public static class TextureRecord {
-        public final TextureView texture;
+        public final AutoFitTextureView texture;
         public final SurfaceTexture surface;
         public final int width;
         public final int height;
-        TextureRecord(TextureView texture, SurfaceTexture surface, int width, int height) {
+        TextureRecord(AutoFitTextureView texture, SurfaceTexture surface, int width, int height) {
             this.texture = texture;
             this.surface = surface;
             this.width = width;
@@ -22,8 +24,10 @@ public class Texture {
         }
     }
 
-    public static Single<TextureRecord> getTextureSurface(TextureView texture) {
-        Single<TextureRecord> observable = Single.create(emitter -> {
+    public static Single<TextureRecord> setTextureListener(Activity act, int textureId) {
+        AutoFitTextureView texture = (AutoFitTextureView) act.findViewById(textureId);
+
+        Single<TextureRecord> result = Single.create(emitter -> {
             TextureView.SurfaceTextureListener surfaceCallback = new TextureView.SurfaceTextureListener() {
                 @Override
                 public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -45,10 +49,11 @@ public class Texture {
 
                 }
             };
-
             texture.setSurfaceTextureListener(surfaceCallback);
         });
 
-        return observable.cache();
+        return result.cache();
     }
+
+
 }

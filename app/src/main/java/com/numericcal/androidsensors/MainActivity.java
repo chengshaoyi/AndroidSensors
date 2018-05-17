@@ -1,16 +1,27 @@
 package com.numericcal.androidsensors;
 
+import android.Manifest;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.TextureView;
 import android.widget.TextView;
+
+import com.tbruyelle.rxpermissions2.RxPermissions;
+import com.uber.autodispose.AutoDispose;
+import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
+
+import io.reactivex.Observable;
+import io.reactivex.Single;
+import io.reactivex.subjects.AsyncSubject;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
 
     TextView statusText;
-    TextureView camView;
+    Single<Texture.TextureRecord> camViewEvent;
+
+    RxPermissions rxPerm;
+    final AsyncSubject<Boolean> camPerm = AsyncSubject.create();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,19 +29,35 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         statusText = (TextView) findViewById(R.id.statusText);
-        camView = (TextureView) findViewById(R.id.camView);
+        camViewEvent = Texture.setTextureListener(this, R.id.camView);
+
+        rxPerm = new RxPermissions(this);
+        rxPerm.request(Manifest.permission.CAMERA)
+                .map(grant -> { // abuse reconnect until we get permission
+                    if (grant) return "";
+                    else throw new Exception("");
+                })
+                .retry()
+                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
+                .subscribe(x -> {
+                    camPerm.onNext(true);
+                    camPerm.onComplete();
+
+                    Log.d(TAG, "Got the CAMERA permission.");
+                }); // must be done here (see lib docs)
     }
 
     @Override
     protected void onResume() {
-        super.onResume();;
+        super.onResume();
 
-        Texture.getTextureSurface(camView)
+        Observable.combineLatest(camViewEvent.toObservable(), camPerm, (e, __) -> {return e;})
+                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
                 .subscribe(tr -> {
-                    Log.wtf(TAG, "Thread: " + Thread.currentThread().getName());
-                    statusText.setText("Surface is ready! Size: " + tr.width + " x " + tr.height);
-                    Log.wtf(TAG, "Surface is ready!");
+                    Log.wtf(TAG, "I did get it " + tr.width);
                 });
+
+
     }
 
     @Override
