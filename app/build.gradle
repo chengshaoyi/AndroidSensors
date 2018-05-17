@@ -47,6 +47,11 @@ dependencies {
     implementation "com.uber.autodispose:autodispose-android:0.8.0"
     implementation "com.uber.autodispose:autodispose-android-archcomponents:0.8.0"
 
+    // deal with inconsistencies in camera across vendors
+    implementation "io.fotoapparat.fotoapparat:library:2.2.0"
+    implementation "io.fotoapparat.fotoapparat:adapter-rxjava2:2.2.0"
+
+
     // permissions
     implementation "com.tbruyelle.rxpermissions2:rxpermissions:0.9.5@aar"
 }

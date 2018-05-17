@@ -1,8 +1,5 @@
 package com.numericcal.androidsensors;
 
-import android.Manifest;
-import android.app.Activity;
-import android.content.pm.PackageManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -16,18 +13,12 @@ import android.hardware.camera2.params.StreamConfigurationMap;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.util.Pair;
 import android.view.Surface;
 
 import java.util.List;
 
-import io.reactivex.Completable;
-import io.reactivex.CompletableEmitter;
-import io.reactivex.CompletableOnSubscribe;
 import io.reactivex.Observable;
-import io.reactivex.functions.Action;
 import io.reactivex.functions.Function;
 
 public class Camera {

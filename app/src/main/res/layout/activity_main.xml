@@ -12,9 +12,10 @@
         android:layout_height="wrap_content"
         android:text="Hello World!" />
 
-    <com.numericcal.androidsensors.AutoFitTextureView
-        android:id="@+id/camView"
+    <io.fotoapparat.view.CameraView
+        android:id="@+id/cameraView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_below="@+id/statusText" />
 
 </RelativeLayout>
