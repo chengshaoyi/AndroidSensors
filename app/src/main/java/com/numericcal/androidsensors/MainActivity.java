@@ -33,8 +33,8 @@ public class MainActivity extends AppCompatActivity {
     TextView statusText;
     CameraView cameraView;
 
-    Fotoapparat fotoapparat;
-    PublishSubject<Frame> frames = PublishSubject.create();
+    RxPermissions rxPerm;
+    Single<Boolean> camPerm;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,36 +44,23 @@ public class MainActivity extends AppCompatActivity {
         statusText = (TextView) findViewById(R.id.statusText);
         cameraView = (CameraView) findViewById(R.id.cameraView);
 
-        fotoapparat = Fotoapparat
-                .with(this)
-                .into(cameraView)
-                .previewScaleType(ScaleType.CenterCrop)
-                .lensPosition(back())
-                .frameProcessor((Frame f) -> frames.onNext(f))
-                .build();
-
-        /*
         rxPerm = new RxPermissions(this);
-        rxPerm.request(Manifest.permission.CAMERA)
-                .map(grant -> { // abuse reconnect until we get permission
-                    if (grant) return "";
-                    else throw new Exception("");
-                })
-                .retry()
-                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
-                .subscribe(x -> {
-                    camPerm.onNext(true);
-                    camPerm.onComplete();
-
-                    Log.d(TAG, "Got the CAMERA permission.");
-                }); // must be done here (see lib docs)
-                */
+        camPerm = Camera.getPermission(this, rxPerm);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
+        camPerm
+                .flatMapObservable(__ -> {
+                    return Camera.setupCamera(this, cameraView);
+                })
+                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
+                .subscribe(__ -> {
+                    Log.wtf(TAG, "Frame!");
+                });
+        /*
         frames
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
                 .subscribe(f -> {
@@ -81,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
                 });
         statusText.setText("Hello!");
         fotoapparat.start();
+        */
 
         /*
         Observable.combineLatest(camViewEvent.toObservable(), camPerm, (e, __) -> {return e;})
@@ -97,7 +85,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
 
-        fotoapparat.stop();
+        //
+        // fotoapparat.stop();
 
         super.onPause();
     }
