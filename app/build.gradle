@@ -34,7 +34,7 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
 
     // reactive stuff
-    implementation "io.reactivex.rxjava2:rxjava:2.1.9"
+    implementation "io.reactivex.rxjava2:rxjava:2.1.13"
     implementation "io.reactivex.rxjava2:rxandroid:2.0.2"
 
     // UI stuff
@@ -51,6 +51,8 @@ dependencies {
     implementation "io.fotoapparat.fotoapparat:library:2.2.0"
     implementation "io.fotoapparat.fotoapparat:adapter-rxjava2:2.2.0"
 
+    // numericcal edge SDK for Android
+    implementation "com.numericcal.edge:edge:0.5.6-beta"
 
     // permissions
     implementation "com.tbruyelle.rxpermissions2:rxpermissions:0.9.5@aar"
