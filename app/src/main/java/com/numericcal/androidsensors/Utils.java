@@ -1,5 +1,8 @@
 package com.numericcal.androidsensors;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class Utils {
     public static final String TAG = "AS.Utils";
 
@@ -15,5 +18,15 @@ public class Utils {
         }
 
         return pos;
+    }
+
+    public static List<String> topkLabels(float[] probs, List<String> labels, int TOP_LABELS) {
+        List<String> topLabels = new ArrayList<>();
+        for(int k=0; k<TOP_LABELS; k++) {
+            int maxPos = Utils.argmax(probs);
+            probs[maxPos] = 0.0f;
+            topLabels.add(labels.get(maxPos));
+        }
+        return topLabels;
     }
 }

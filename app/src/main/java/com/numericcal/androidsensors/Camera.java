@@ -9,6 +9,7 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.widget.TextView;
 
 import com.tbruyelle.rxpermissions2.RxPermissions;
 import com.uber.autodispose.AutoDispose;
@@ -17,12 +18,12 @@ import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
 import java.io.ByteArrayOutputStream;
 
 import io.fotoapparat.Fotoapparat;
-import io.fotoapparat.parameter.Resolution;
 import io.fotoapparat.parameter.ScaleType;
 import io.fotoapparat.preview.Frame;
 import io.fotoapparat.view.CameraView;
 import static io.fotoapparat.selector.LensPositionSelectorsKt.back;
 
+import io.reactivex.BackpressureStrategy;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableTransformer;
@@ -34,21 +35,20 @@ public class Camera {
     private static final String TAG = "AS.Camera";
 
     /**
-     * We use RxPermissions, hence this should be called from onCreate.
+     * RxPermissions seems to require calling this in onCreate.
      * @param act - calling activity
      * @param rxp - RxPermissions manager
      * @return We annoy the user until they give the permission. Complete when granted.
      */
-    public static Completable getPermission(AppCompatActivity act, RxPermissions rxp) {
+    public static Completable getPermission(AppCompatActivity act, RxPermissions rxp, TextView statusText) {
         CompletableSubject sig = CompletableSubject.create();
         rxp
                 .request(Manifest.permission.CAMERA)
                 .map(grant -> { if (grant) return ""; else throw new Exception("");})
-                .retry(10)
+                .retry(5)
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(act)))
-                .subscribe(__ -> {
-                    sig.onComplete();
-                });
+                .subscribe(__ -> sig.onComplete(),
+                        thr -> statusText.setText("We need CAMERA permission! Please restart."));
 
         return sig;
     }
@@ -58,9 +58,13 @@ public class Camera {
      * @param act - activity
      * @param preview - Fotoapparat view
      * @param permission - completable obtaining CAMERA permission
+     * @param width - desired bitmap width
+     * @param height - desired bitmap height
      * @return a stream of frames grabbed by Fotoapparat
      */
-    public static Observable<Frame> setupCamera(AppCompatActivity act, CameraView preview, Completable permission) {
+    public static Flowable<Bitmap> getFeed(
+            AppCompatActivity act, CameraView preview, Completable permission,
+            int width, int height) {
 
         Observable<Frame> obs = Observable.create(emitter -> {
             Fotoapparat fotoapparat = Fotoapparat
@@ -76,7 +80,12 @@ public class Camera {
                 fotoapparat.stop();
             });
         });
-        return permission.andThen(obs);
+        return permission
+                .andThen(obs)
+                .toFlowable(BackpressureStrategy.LATEST)
+                .compose(yuv2bmp())
+                .compose(bmpRotate(90))
+                .compose(scaleTo(width, height));
     }
 
     /**
@@ -158,9 +167,9 @@ public class Camera {
     }
 
     /**
-     * A simple rotation step.
-     * @param angle
-     * @return
+     * Simple bitmap rotation.
+     * @param angle - clockwise angle to rotate.
+     * @return rotated bitmap
      */
     public static FlowableTransformer<Bitmap, Bitmap> bmpRotate(float angle) {
         return upstream ->

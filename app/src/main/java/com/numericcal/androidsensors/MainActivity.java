@@ -1,26 +1,18 @@
 package com.numericcal.androidsensors;
 
-import android.graphics.Canvas;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.TextureView;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.tbruyelle.rxpermissions2.RxPermissions;
 import com.uber.autodispose.AutoDispose;
 import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
 
-import io.fotoapparat.parameter.Resolution;
-import io.fotoapparat.preview.Frame;
 import io.fotoapparat.view.CameraView;
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Completable;
-import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.schedulers.Schedulers;
 
 import com.numericcal.edge.Dnn;
 
@@ -37,8 +29,6 @@ public class MainActivity extends AppCompatActivity {
     TextView statusText;
     CameraView cameraView;
 
-    ImageView imgView;
-
     RxPermissions rxPerm;
     Completable camPerm;
 
@@ -53,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
         cameraView = (CameraView) findViewById(R.id.cameraView);
 
         rxPerm = new RxPermissions(this);
-        camPerm = Camera.getPermission(this, rxPerm); // must run in onCreate, see RxPermissions
+        camPerm = Camera.getPermission(this, rxPerm, statusText); // must run in onCreate, see RxPermissions
 
     }
 
@@ -74,25 +64,11 @@ public class MainActivity extends AppCompatActivity {
                     int inputHeight = handle.info.inputShape().get(2);
                     int outputLen = handle.info.outputShape().get(1);
 
-                    Observable<Frame> cameraFeed = Camera.setupCamera(this, cameraView, camPerm);
-
-                    return cameraFeed
-                            .toFlowable(BackpressureStrategy.LATEST)
-                            .compose(Camera.yuv2bmp())
-                            .compose(Camera.bmpRotate(90))
-                            .compose(Camera.scaleTo(inputWidth, inputHeight))
+                    return Camera.getFeed(this, cameraView, camPerm, inputWidth, inputHeight)
                             .compose(Camera.bmpToFloatHWC(IMAGE_MEAN, IMAGE_STD))
                             .compose(handle.runInference())
                             .compose(Camera.lpf(outputLen, 0.75f))
-                            .map(probs -> {
-                                List<String> topLabels = new ArrayList<>();
-                                for(int k=0; k<TOP_LABELS; k++) {
-                                    int maxPos = Utils.argmax(probs);
-                                    probs[maxPos] = 0.0f;
-                                    topLabels.add(handle.info.labels().get(maxPos));
-                                }
-                                return topLabels;
-                            });
+                            .map(probs -> Utils.topkLabels(probs, handle.info.labels(), TOP_LABELS));
                 })
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
