@@ -24,7 +24,7 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
     aaptOptions {
-        noCompress "pb", "md", "tflite", "lite"
+        noCompress "pb", "md", "tflite", "lite", "labels"
     }
 }
 
@@ -55,7 +55,7 @@ dependencies {
     implementation "io.fotoapparat.fotoapparat:adapter-rxjava2:2.2.0"
 
     // numericcal edge SDK for Android
-    implementation "com.numericcal.edge:edge:0.7.1-beta"
+    implementation "com.numericcal.edge:edge:0.8.0-beta"
 
     // permissions
     implementation "com.tbruyelle.rxpermissions2:rxpermissions:0.9.5@aar"
