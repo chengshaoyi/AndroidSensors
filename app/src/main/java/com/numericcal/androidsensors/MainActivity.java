@@ -11,13 +11,9 @@ import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
 
 import io.fotoapparat.view.CameraView;
 import io.reactivex.Completable;
-import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 
 import com.numericcal.edge.Dnn;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
@@ -53,11 +49,11 @@ public class MainActivity extends AppCompatActivity {
 
         dnnManager = Dnn.createManager(getApplicationContext());
 
-        Single<Dnn.Handle> dnn = dnnManager.createHandle(
+        dnnManager.createHandle(
                 Dnn.configBuilder
-                        .setAccount("rrs")
-                        .setModel("poets2-by-rrs"));
-        dnn
+                        .fromAccount("rrs")
+                        .withAuthToken("")
+                        .getModelFromCollection("poets2tflite-by-rrs"))
                 .toFlowable()
                 .flatMap(handle -> {
                     int inputWidth = handle.info.inputShape().get(1);
