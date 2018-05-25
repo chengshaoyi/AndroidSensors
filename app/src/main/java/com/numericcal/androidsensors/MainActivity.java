@@ -51,9 +51,9 @@ public class MainActivity extends AppCompatActivity {
 
         dnnManager.createHandle(
                 Dnn.configBuilder
-                        .fromAccount("rrs")
-                        .withAuthToken("")
-                        .getModelFromCollection("poets2tflite-by-rrs"))
+                        .fromAccount("myUserName")
+                        .withAuthToken("myToken")
+                        .getModelFromCollection("myCollection"))
                 .toFlowable()
                 .flatMap(handle -> {
                     int inputWidth = handle.info.inputShape().get(1);
