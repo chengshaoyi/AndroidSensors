@@ -12,20 +12,19 @@
         android:layout_height="wrap_content"
         android:text="Hello World!" />
 
-    <io.fotoapparat.view.CameraView
-        android:id="@+id/cameraView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/statusText" />
-
     <!-- for debugging purposes enable below and fix cameraView layout_{width,height} -->
-    <!--
     <ImageView
         android:id="@+id/imgView"
-        android:layout_below="@+id/cameraView"
-        android:layout_width="224dp"
-        android:layout_height="224dp" />
-    -->
+        android:layout_below="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <io.fotoapparat.view.CameraView
+        android:id="@+id/cameraView"
+        android:layout_below="@+id/imgView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
 
 
 </RelativeLayout>

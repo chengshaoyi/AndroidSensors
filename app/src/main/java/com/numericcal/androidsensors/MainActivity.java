@@ -1,8 +1,10 @@
 package com.numericcal.androidsensors;
 
+import android.graphics.BitmapFactory;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.tbruyelle.rxpermissions2.RxPermissions;
@@ -11,9 +13,17 @@ import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
 
 import io.fotoapparat.view.CameraView;
 import io.reactivex.Completable;
+import io.reactivex.Flowable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 
 import com.numericcal.edge.Dnn;
+
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
@@ -28,6 +38,9 @@ public class MainActivity extends AppCompatActivity {
     RxPermissions rxPerm;
     Completable camPerm;
 
+    // debug stuff
+    ImageView imgView;
+
     Dnn.Manager dnnManager;
 
     @Override
@@ -41,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
         rxPerm = new RxPermissions(this);
         camPerm = Camera.getPermission(this, rxPerm, statusText); // must run in onCreate, see RxPermissions
 
+        imgView = (ImageView) findViewById(R.id.imgView);
     }
 
     @Override
@@ -51,29 +65,82 @@ public class MainActivity extends AppCompatActivity {
 
         dnnManager.createHandle(
                 Dnn.configBuilder
-                        .fromAccount("myUserName")
-                        .withAuthToken("myToken")
-                        .getModelFromCollection("myCollection"))
+                        .fromAccount("MLDeployer")
+                        .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
+                        .getModelFromCollection("tinyYolo2Deploy-by-MLDeployer"))
                 .toFlowable()
-                .flatMap(handle -> {
-                    int inputWidth = handle.info.inputShape().get(1);
-                    int inputHeight = handle.info.inputShape().get(2);
-                    int outputLen = handle.info.outputShape().get(1);
+                .flatMap(yolo -> {
 
-                    return Camera.getFeed(this, cameraView, camPerm, inputWidth, inputHeight)
-                            .compose(Camera.bmpToFloatHWC(IMAGE_MEAN, IMAGE_STD))
-                            .compose(handle.runInference())
-                            .compose(Camera.lpf(outputLen, 0.75f))
-                            .map(probs -> Utils.topkLabels(probs, handle.info.labels(), TOP_LABELS));
+                    /** BEGIN MODEL PARAM SECTION **/
+                    int inputWidth = yolo.info.inputShape().get(1);
+                    int inputHeight = yolo.info.inputShape().get(2);
+                    int outputLen = yolo.info.outputShape().get(1);
+
+                    int S = 13;
+                    int C = 20;
+                    int B = 5;
+
+                    float scaleX = (float) inputWidth / S;
+                    float scaleY = (float) inputHeight / S;
+
+                    List<Yolo.AnchorBox> anchors = new ArrayList<>();
+                    anchors.add(new Yolo.AnchorBox(1.08f, 1.19f));
+                    anchors.add(new Yolo.AnchorBox(3.42f, 4.41f));
+                    anchors.add(new Yolo.AnchorBox(6.63f, 11.38f));
+                    anchors.add(new Yolo.AnchorBox(9.42f, 5.11f));
+                    anchors.add(new Yolo.AnchorBox(16.62f, 10.52f));
+
+                    List<String> labels = Arrays.asList(
+                            "aeroplane", "bicycle", "bird", "boat", "bottle",
+                            "bus", "car", "cat", "chair", "cow",
+                            "dining table", "dog", "horse", "motorbike", "person",
+                            "potted plant", "sheep", "sofa", "train", "tv monitor");
+                    /** END MODEL PARAM SECTION **/
+
+                    Log.wtf(TAG, "inputWidth " + inputWidth);
+                    Log.wtf(TAG, "inputHeight " + inputHeight);
+                    Log.wtf(TAG, "scaleX " + scaleX);
+                    Log.wtf(TAG, "scaleY " + scaleY);
+
+                    //// Camera.getFeed(this, cameraView, camPerm, inputWidth, inputHeight)
+
+                    return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(),
+                                    Arrays.asList("examples/dog.jpg"), BitmapFactory::decodeStream))
+                            .delay(1, TimeUnit.SECONDS)
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .doOnNext(bmp -> {
+                                Log.wtf(TAG, "pic: " + bmp.getHeight() + " x " + bmp.getWidth());
+                                imgView.setImageBitmap(bmp);
+                            })
+                            .compose(Camera.scaleTo(inputWidth, inputHeight))
+                            .compose(Yolo.v2Normalize())
+                            .doOnNext(arr -> {
+                                StringBuilder arrStr = new StringBuilder();
+                                for(int i=0; i<10; i++) {
+                                    arrStr.append(arr[i]);
+                                    arrStr.append(", ");
+                                }
+                                Log.wtf(TAG, "first few IN [" + arrStr.toString() + "]");
+                            })
+                            .compose(yolo.runInference())
+                            .doOnNext(arr -> {
+
+                                Log.wtf(TAG, "first few OUT [" + Utils.nElemStr(10, 0, arr) + "]");
+                            })
+                            .compose(Yolo.splitCells(S, B, C))
+                            .doOnNext(cellBoxes -> Log.wtf(TAG, "Should have " + (13*13*5) + " boxes in " + cellBoxes.size() + " cellBox lists"))
+                            .compose(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY))
+                            .doOnNext(boxList -> {
+                                Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes!");
+                                for(int i=0; i<boxList.size(); i++) {
+                                    Yolo.BBox bbox = boxList.get(i);
+                                    Log.wtf(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
+                                }
+                            });
                 })
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
-                .subscribe(
-                        res -> {
-                            Log.wtf(TAG, "Got a result " + res.toString());
-                            statusText.setText(res.get(0));
-                            },
-                        (Throwable err) -> { Log.wtf(TAG, "Got an ERROR " + err.toString()); });
+                .subscribe();
 
     }
 
