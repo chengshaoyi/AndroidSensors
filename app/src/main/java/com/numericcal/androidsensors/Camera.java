@@ -54,13 +54,10 @@ public class Camera {
      * @param act - activity
      * @param preview - Fotoapparat view
      * @param permission - completable obtaining CAMERA permission
-     * @param width - desired bitmap width
-     * @param height - desired bitmap height
      * @return a stream of frames grabbed by Fotoapparat
      */
     public static Flowable<Bitmap> getFeed(
-            AppCompatActivity act, CameraView preview, Completable permission,
-            int width, int height) {
+            AppCompatActivity act, CameraView preview, Completable permission) {
 
         Observable<Frame> obs = Observable.create(emitter -> {
             Fotoapparat fotoapparat = Fotoapparat
@@ -80,8 +77,7 @@ public class Camera {
                 .andThen(obs)
                 .toFlowable(BackpressureStrategy.LATEST)
                 .compose(Utils.yuv2bmp())
-                .compose(Utils.bmpRotate(90))
-                .compose(scaleTo(width, height));
+                .compose(Utils.bmpRotate(90));
     }
 
     /**

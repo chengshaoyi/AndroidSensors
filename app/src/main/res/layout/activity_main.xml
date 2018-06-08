@@ -1,30 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    tools:context=".MainActivity"
+    tools:layout_editor_absoluteY="81dp">
 
+    <!--
     <TextView
         android:id="@+id/statusText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Hello World!" />
 
-    <!-- for debugging purposes enable below and fix cameraView layout_{width,height} -->
-    <ImageView
-        android:id="@+id/imgView"
-        android:layout_below="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <io.fotoapparat.view.CameraView
-        android:id="@+id/cameraView"
-        android:layout_below="@+id/imgView"
+    <FrameLayout
+        android:id="@+id/frameView"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:visibility="visible"
+        app:layout_constraintVertical_weight="1">
 
+        <io.fotoapparat.view.CameraView
+            android:id="@+id/cameraView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
+        <ImageView
+            android:id="@+id/overlayView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
-</RelativeLayout>
+        <ImageView
+            android:id="@+id/extraOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/dbgView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible"
+        app:layout_constraintVertical_weight="1"/>
+
+    -->
+
+    <FrameLayout
+        android:id="@+id/viewArea"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="2dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/debugArea"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/overlayView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:srcCompat="@android:color/holo_purple" />
+
+        <ImageView
+            android:id="@+id/extraOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:srcCompat="@android:color/holo_orange_dark" />
+    </FrameLayout>
+
+    <RelativeLayout
+        android:id="@+id/debugArea"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginBottom="2dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/viewArea">
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Hello, World!" />
+
+        <ImageView
+            android:id="@+id/dbgView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@+id/statusText"
+            app:srcCompat="@android:color/holo_purple" />
+    </RelativeLayout>
+</android.support.constraint.ConstraintLayout>

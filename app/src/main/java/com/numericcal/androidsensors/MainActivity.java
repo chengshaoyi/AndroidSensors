@@ -1,6 +1,10 @@
 package com.numericcal.androidsensors;
 
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -18,10 +22,8 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 
 import com.numericcal.edge.Dnn;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -38,8 +40,10 @@ public class MainActivity extends AppCompatActivity {
     RxPermissions rxPerm;
     Completable camPerm;
 
-    // debug stuff
-    ImageView imgView;
+    ImageView overlayView;
+    ImageView extraOverlay;
+
+    ImageView dbgView;
 
     Dnn.Manager dnnManager;
 
@@ -49,12 +53,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         statusText = (TextView) findViewById(R.id.statusText);
-        cameraView = (CameraView) findViewById(R.id.cameraView);
+        //cameraView = (CameraView) findViewById(R.id.cameraView);
 
         rxPerm = new RxPermissions(this);
         camPerm = Camera.getPermission(this, rxPerm, statusText); // must run in onCreate, see RxPermissions
 
-        imgView = (ImageView) findViewById(R.id.imgView);
+        overlayView = (ImageView) findViewById(R.id.overlayView);
+        extraOverlay = (ImageView) findViewById(R.id.extraOverlay);
+
+        dbgView = (ImageView) findViewById(R.id.dbgView);
     }
 
     @Override
@@ -98,20 +105,26 @@ public class MainActivity extends AppCompatActivity {
                             "potted plant", "sheep", "sofa", "train", "tv monitor");
                     /** END MODEL PARAM SECTION **/
 
-                    Log.wtf(TAG, "inputWidth " + inputWidth);
-                    Log.wtf(TAG, "inputHeight " + inputHeight);
-                    Log.wtf(TAG, "scaleX " + scaleX);
-                    Log.wtf(TAG, "scaleY " + scaleY);
+                    Bitmap bmpOverlay = Bitmap.createBitmap(inputWidth, inputHeight, Bitmap.Config.ARGB_8888);
+                    Canvas canvasOverlay = new Canvas(bmpOverlay);
 
-                    //// Camera.getFeed(this, cameraView, camPerm, inputWidth, inputHeight)
+                    //// Camera.getFeed(this, cameraView, camPerm)
 
                     return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(),
                                     Arrays.asList("examples/dog.jpg"), BitmapFactory::decodeStream))
+                            // now we know the frame size
                             .delay(1, TimeUnit.SECONDS)
                             .observeOn(AndroidSchedulers.mainThread())
                             .doOnNext(bmp -> {
                                 Log.wtf(TAG, "pic: " + bmp.getHeight() + " x " + bmp.getWidth());
-                                imgView.setImageBitmap(bmp);
+                                overlayView.setImageBitmap(bmp);
+
+                                Log.wtf(TAG, "w:h " + overlayView.getHeight());
+
+                                //canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+                                Overlay.drawBox(new Yolo.BBox(0,0,0,0,0,0.0f),
+                                        new Overlay.Line(Color.RED, 4.0f), canvasOverlay);
+                                extraOverlay.setImageBitmap(bmpOverlay);
                             })
                             .compose(Camera.scaleTo(inputWidth, inputHeight))
                             .compose(Yolo.v2Normalize())
