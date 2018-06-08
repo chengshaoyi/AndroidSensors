@@ -4,14 +4,25 @@ import android.graphics.Bitmap;
 import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import io.reactivex.FlowableTransformer;
+
+import static java.lang.Float.compare;
 
 public class Yolo {
 
     private static final String TAG = "AS.Yolo";
 
+    /**
+     * A class to represent all the boxes reported by a single cell.
+     * We do not copy the tensor data, but simply add context (e.g. cell upper left corner x/y)
+     * and start/stop pointer for reading from the original YOLOv2 output tensor.
+     *
+     * Every object is relevant for all the boxes reported by a single cell.
+     */
     public static class CellBoxes {
         float[] arr; // raw array for B boxes on C classes
         int startOffset;
@@ -37,6 +48,9 @@ public class Yolo {
         }
     }
 
+    /**
+     * A class to represent a single bounding box, it's class and confidence of the detection.
+     */
     public static class BBox {
         int bottom;
         int top;
@@ -44,7 +58,6 @@ public class Yolo {
         int right;
 
         int maxClassArg;
-        String maxClass;
         float confidence;
 
         BBox(int bottom, int top, int left, int right, int maxClassArg, float confidence) {
@@ -58,6 +71,7 @@ public class Yolo {
         }
 
         @Override
+        /* we match the python code for debug simplicity */
         public String toString() {
             return "[(" + left + ", " + top + ", " + right + ", " + bottom + ") | " + maxClassArg + " | " + confidence + "]";
         }
@@ -72,10 +86,23 @@ public class Yolo {
         }
     }
 
+    /**
+     * Preprocessing transformer. Normalizes image data to [0.0, 1.0] range and aligns it in memory
+     * in NHWC.BGR order.
+     * @return float[] representation of the input image
+     */
     public static FlowableTransformer<Bitmap, float[]> v2Normalize() {
         return Utils.bmpToFloat_HWC_BGR(0, 255.0f);
     }
 
+    /**
+     * Slice YOLOv2 output tensor into sections. Each section is relevant for all the boxes of one
+     * image cell.
+     * @param S - number of x/y divisions on the cell grid
+     * @param B - boxes per cell
+     * @param C - classes detected per box
+     * @return
+     */
     public static FlowableTransformer<float[], List<CellBoxes>> splitCells(int S, int B, int C) {
         return upstream ->
                 upstream
@@ -91,11 +118,19 @@ public class Yolo {
                             lst.add(new CellBoxes((float) col, (float) row, S, B, C, tensor, offset, offset + dataPerCell));
                         }
                     }
-                    Log.wtf(TAG, "data per cell: " + dataPerCell);
                     return lst;
                 });
     }
 
+    /**
+     * Detect potential boxes above the given threshold. Repackage them by calculating their
+     * detected class, confidence in that detection and their actual shapes.
+     * @param threshold - minimum overal confidence to accept detection
+     * @param anchors - list of anchor box descriptions for this network (DNN parameter)
+     * @param scaleW - width scaling for calculations based on image width vs cell width (DNN parameter)
+     * @param scaleH - height scaling (DNN parameter)
+     * @return
+     */
     public static FlowableTransformer<List<CellBoxes>, List<BBox>> thresholdAndBox(
             float threshold, List<AnchorBox> anchors, float scaleW, float scaleH) {
         return upstream ->
@@ -147,11 +182,58 @@ public class Yolo {
                 });
     }
 
+    /**
+     * Calculate box area. Assumes (x->right, y->down) coordinate system. See thresholdAndBox.
+     * @param b
+     * @return
+     */
+    public static float area(BBox b) {
+        return (float) (b.bottom - b.top) * (b.right - b.left);
+    }
+
+    /**
+     * Calculate Intersection/Union metric. Assumes (x->right, y->down) coordinate system.
+     * @param x
+     * @param y
+     * @return
+     */
+    public static float iou(BBox x, BBox y) {
+        int top = Math.max(x.top, y.top);
+        int bottom = Math.min(x.bottom, y.bottom);
+        if (bottom <= top) { // remember y->down
+            return 0.0f; // no intersection
+        }
+
+        int left = Math.max(x.left, y.left);
+        int right = Math.min(x.right, y.right);
+        if (right <= left) {
+            return 0.0f;
+        }
+
+        float intersection = area(new BBox(bottom, top, left, right, 0, 0.0f)); // dummy maxClassArg/confidence
+
+        return intersection / (area(x) + area(y) - intersection);
+    }
+
     public static FlowableTransformer<List<BBox>, List<BBox>> suppressNonMax(float thresholdIoU) {
         return upstream ->
                 upstream
                 .map(bBoxes -> {
                     List<BBox> boxes = new ArrayList<>();
+
+                    if (bBoxes.size() > 0) {
+                        Collections.sort(bBoxes, (b1,b2) -> compare(b2.confidence, b1.confidence));
+                        boxes.add(bBoxes.get(0));
+                        bBoxes.remove(0);
+
+                        for (BBox newBox: bBoxes) {
+                            boolean newDetection = true;
+                            for (BBox detectedBox: boxes) {
+                                if (iou(newBox, detectedBox) > thresholdIoU) newDetection = false;;
+                            }
+                            if (newDetection) boxes.add(newBox); // does not overlap with others too much, add it
+                        }
+                    }
 
                     return boxes;
                 });

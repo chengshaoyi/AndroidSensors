@@ -76,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
                     int inputHeight = yolo.info.inputShape().get(2);
                     int outputLen = yolo.info.outputShape().get(1);
 
+                    /** NOTE: this should be yolo.params.get("S"), yolo.params.get("C") or something alike **/
                     int S = 13;
                     int C = 20;
                     int B = 5;
@@ -114,22 +115,10 @@ public class MainActivity extends AppCompatActivity {
                             })
                             .compose(Camera.scaleTo(inputWidth, inputHeight))
                             .compose(Yolo.v2Normalize())
-                            .doOnNext(arr -> {
-                                StringBuilder arrStr = new StringBuilder();
-                                for(int i=0; i<10; i++) {
-                                    arrStr.append(arr[i]);
-                                    arrStr.append(", ");
-                                }
-                                Log.wtf(TAG, "first few IN [" + arrStr.toString() + "]");
-                            })
                             .compose(yolo.runInference())
-                            .doOnNext(arr -> {
-
-                                Log.wtf(TAG, "first few OUT [" + Utils.nElemStr(10, 0, arr) + "]");
-                            })
                             .compose(Yolo.splitCells(S, B, C))
-                            .doOnNext(cellBoxes -> Log.wtf(TAG, "Should have " + (13*13*5) + " boxes in " + cellBoxes.size() + " cellBox lists"))
                             .compose(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY))
+                            .compose(Yolo.suppressNonMax(0.3f))
                             .doOnNext(boxList -> {
                                 Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes!");
                                 for(int i=0; i<boxList.size(); i++) {

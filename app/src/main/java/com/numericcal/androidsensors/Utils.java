@@ -15,9 +15,19 @@ import java.util.List;
 import io.fotoapparat.preview.Frame;
 import io.reactivex.FlowableTransformer;
 
+/**
+ * Helper functions.
+ */
 public class Utils {
     public static final String TAG = "AS.Utils";
 
+    /**
+     * A simple printer for arrays during debugging.
+     * @param n - how many items to print
+     * @param offset - index of the first item
+     * @param arr - the array to print
+     * @return a string representation of the print
+     */
     public static String nElemStr(int n, int offset, float[] arr) {
         StringBuilder arrStr = new StringBuilder();
         for(int i=0; i<n; i++) {
@@ -57,6 +67,13 @@ public class Utils {
         return pos;
     }
 
+    /**
+     * Find the maxumum element in the subarray.
+     * @param arr - the array to search
+     * @param start - start index (inclusive)
+     * @param stop - stop index (exclusive)
+     * @return the value of the max
+     */
     public static float max(float[] arr, int start, int stop) {
         float max = arr[start];
         for(int k=start; k<stop; k++) {
@@ -68,9 +85,17 @@ public class Utils {
         return max;
     }
 
-    public static List<String> topkLabels(float[] probs, List<String> labels, int TOP_LABELS) {
+    /**
+     * Find top k labels. Trivial implementation. Complexity k*n is not great.
+     * For small k (2-3) probably faster than to sort. Not important to optimize.
+     * @param probs - probability distribution for labels
+     * @param labels - list of labels in string forms
+     * @param k - how many labels to find
+     * @return
+     */
+    public static List<String> topkLabels(float[] probs, List<String> labels, int k) {
         List<String> topLabels = new ArrayList<>();
-        for(int k=0; k<TOP_LABELS; k++) {
+        for(int i=0; i<k; i++) {
             int maxPos = Utils.argmax(probs, 0, probs.length);
             probs[maxPos] = 0.0f;
             topLabels.add(labels.get(maxPos));
@@ -78,6 +103,14 @@ public class Utils {
         return topLabels;
     }
 
+    /**
+     * Calculate softmax on a sub-array [fromOffset, fromOffset+len-1].
+     * @param len - length of the subarray
+     * @param fromOffset - starting offset for reading
+     * @param from - read array
+     * @param toOffset - starting offset for writing
+     * @param to - write array
+     */
     public static void softmax(int len, int fromOffset, float[] from, int toOffset, float[] to) {
         float acc = 0.0f;
         float curr;
@@ -109,10 +142,20 @@ public class Utils {
         }
     }
 
+    /**
+     * Calculate sigmoid(x) = 1/(1 + e^-x).
+     * @param num
+     * @return
+     */
     public static float sigmoidS(float num) {
         return (float) (1.0/(1.0 + Math.exp(-num)));
     }
 
+    /**
+     * Extract red/green/blue from the integer representation of a pixel (ARGB).
+     * @param pix
+     * @return
+     */
     static int red(int pix) { return (pix >> 16) & 0xFF; }
     static int green(int pix) { return (pix >> 8) & 0xFF; }
     static int blue(int pix) { return (pix) & 0xFF; }
