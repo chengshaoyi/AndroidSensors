@@ -5,7 +5,6 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import io.reactivex.FlowableTransformer;
@@ -237,5 +236,17 @@ public class Yolo {
 
                     return boxes;
                 });
+    }
+
+    /**
+     * Scale the BBox assuming assuming simple central projection.
+     * @param b - the box to scale
+     * @param stretchWidth - stretch of the x axis
+     * @param stretchHeight - stretch of the y axis
+     * @return
+     */
+    public static BBox rescaleBBoxBy(BBox b, float stretchWidth, float stretchHeight) {
+        return new BBox( Math.round(b.bottom * stretchHeight), Math.round(b.top * stretchHeight),
+                Math.round(b.left * stretchWidth), Math.round(b.right * stretchWidth), b.maxClassArg, b.confidence);
     }
 }

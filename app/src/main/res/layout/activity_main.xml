@@ -53,21 +53,29 @@
         android:layout_height="0dp"
         android:layout_marginBottom="2dp"
         android:layout_marginTop="8dp"
+        app:layout_constraintVertical_weight="0.6"
         app:layout_constraintBottom_toTopOf="@+id/debugArea"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <io.fotoapparat.view.CameraView
+            android:id="@+id/cameraView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
         <ImageView
             android:id="@+id/overlayView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scaleType="fitXY"
             app:srcCompat="@android:color/holo_purple" />
 
         <ImageView
             android:id="@+id/extraOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scaleType="fitXY"
             app:srcCompat="@android:color/holo_orange_dark" />
     </FrameLayout>
 
@@ -77,6 +85,7 @@
         android:layout_height="0dp"
         android:layout_marginBottom="2dp"
         android:layout_marginTop="8dp"
+        app:layout_constraintVertical_weight="0.3"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

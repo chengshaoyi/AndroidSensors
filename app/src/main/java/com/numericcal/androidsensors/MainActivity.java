@@ -4,7 +4,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -30,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
 
+    // TODO: this should go into model parameters
     private static final int IMAGE_MEAN = 128;
     private static final float IMAGE_STD = 128.0f;
     private static final int TOP_LABELS = 3;
@@ -105,8 +105,16 @@ public class MainActivity extends AppCompatActivity {
                             "potted plant", "sheep", "sofa", "train", "tv monitor");
                     /** END MODEL PARAM SECTION **/
 
-                    Bitmap bmpOverlay = Bitmap.createBitmap(inputWidth, inputHeight, Bitmap.Config.ARGB_8888);
+                    Bitmap bmpOverlay = Bitmap.createBitmap(overlayView.getWidth(), overlayView.getHeight(), Bitmap.Config.ARGB_8888);
                     Canvas canvasOverlay = new Canvas(bmpOverlay);
+
+                    float scaleWidth = (float) bmpOverlay.getWidth() / inputWidth;
+                    float scaleHeight = (float) bmpOverlay.getHeight() / inputHeight;
+
+                    Log.wtf(TAG, "overlay w/h: " + overlayView.getWidth() + " x " + overlayView.getHeight());
+                    Log.wtf(TAG, "extra w/h: " + extraOverlay.getWidth() + " x " + extraOverlay.getHeight());
+
+                    Log.wtf(TAG, "scaling: " + scaleWidth + " x " + scaleHeight);
 
                     //// Camera.getFeed(this, cameraView, camPerm)
 
@@ -122,9 +130,6 @@ public class MainActivity extends AppCompatActivity {
                                 Log.wtf(TAG, "w:h " + overlayView.getHeight());
 
                                 //canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                                Overlay.drawBox(new Yolo.BBox(0,0,0,0,0,0.0f),
-                                        new Overlay.Line(Color.RED, 4.0f), canvasOverlay);
-                                extraOverlay.setImageBitmap(bmpOverlay);
                             })
                             .compose(Camera.scaleTo(inputWidth, inputHeight))
                             .compose(Yolo.v2Normalize())
@@ -132,12 +137,16 @@ public class MainActivity extends AppCompatActivity {
                             .compose(Yolo.splitCells(S, B, C))
                             .compose(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY))
                             .compose(Yolo.suppressNonMax(0.3f))
+                            .observeOn(AndroidSchedulers.mainThread())
                             .doOnNext(boxList -> {
                                 Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes!");
                                 for(int i=0; i<boxList.size(); i++) {
                                     Yolo.BBox bbox = boxList.get(i);
                                     Log.wtf(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
+                                    Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight),
+                                            new Overlay.Line(Color.RED, 2.0f), canvasOverlay);
                                 }
+                                extraOverlay.setImageBitmap(bmpOverlay);
                             });
                 })
                 .observeOn(AndroidSchedulers.mainThread())
