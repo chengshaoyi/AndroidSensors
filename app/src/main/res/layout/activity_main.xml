@@ -68,15 +68,13 @@
             android:id="@+id/overlayView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            app:srcCompat="@android:color/holo_purple" />
+            android:scaleType="fitXY" />
 
         <ImageView
             android:id="@+id/extraOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            app:srcCompat="@android:color/holo_orange_dark" />
+            android:scaleType="fitXY" />
     </FrameLayout>
 
     <RelativeLayout

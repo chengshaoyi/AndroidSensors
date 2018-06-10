@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -53,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         statusText = (TextView) findViewById(R.id.statusText);
-        //cameraView = (CameraView) findViewById(R.id.cameraView);
+        cameraView = (CameraView) findViewById(R.id.cameraView);
 
         rxPerm = new RxPermissions(this);
         camPerm = Camera.getPermission(this, rxPerm, statusText); // must run in onCreate, see RxPermissions
@@ -118,33 +119,33 @@ public class MainActivity extends AppCompatActivity {
 
                     //// Camera.getFeed(this, cameraView, camPerm)
 
-                    return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(),
-                                    Arrays.asList("examples/dog.jpg"), BitmapFactory::decodeStream))
-                            // now we know the frame size
-                            .delay(1, TimeUnit.SECONDS)
-                            .observeOn(AndroidSchedulers.mainThread())
-                            .doOnNext(bmp -> {
-                                Log.wtf(TAG, "pic: " + bmp.getHeight() + " x " + bmp.getWidth());
-                                overlayView.setImageBitmap(bmp);
-
-                                Log.wtf(TAG, "w:h " + overlayView.getHeight());
-
-                                //canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-                            })
+                    return Camera.getFeed(this, cameraView, camPerm)
+                            //Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(),
+                            //        Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream))
+                            //        .delay(5, TimeUnit.SECONDS)
                             .compose(Camera.scaleTo(inputWidth, inputHeight))
                             .compose(Yolo.v2Normalize())
+                            .onBackpressureLatest()
+                            .doOnNext(__ -> {
+                                Log.wtf(TAG, "TOC");
+                            })
                             .compose(yolo.runInference())
+                            .doOnNext(__ -> {
+                                Log.wtf(TAG, "BOC");
+                            })
                             .compose(Yolo.splitCells(S, B, C))
                             .compose(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY))
                             .compose(Yolo.suppressNonMax(0.3f))
-                            .observeOn(AndroidSchedulers.mainThread())
+                            .observeOn(AndroidSchedulers.mainThread(), false, 1)
                             .doOnNext(boxList -> {
-                                Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes!");
+                                Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes! " + Thread.currentThread().getName());
+                                canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+
                                 for(int i=0; i<boxList.size(); i++) {
                                     Yolo.BBox bbox = boxList.get(i);
                                     Log.wtf(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
-                                    Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight),
-                                            new Overlay.Line(Color.RED, 2.0f), canvasOverlay);
+
+                                    Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight), new Overlay.Line(Color.RED, 2.0f), canvasOverlay);
                                 }
                                 extraOverlay.setImageBitmap(bmpOverlay);
                             });

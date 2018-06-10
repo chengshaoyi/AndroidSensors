@@ -21,6 +21,7 @@ import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableTransformer;
 import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.CompletableSubject;
 
 
@@ -76,6 +77,8 @@ public class Camera {
         return permission
                 .andThen(obs)
                 .toFlowable(BackpressureStrategy.LATEST)
+                .observeOn(Schedulers.computation(), false, 1)
+                .doOnNext(__ -> {Log.wtf(TAG, "TICK! " + Thread.currentThread().getName());})
                 .compose(Utils.yuv2bmp())
                 .compose(Utils.bmpRotate(90));
     }
