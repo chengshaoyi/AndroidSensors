@@ -13,6 +13,7 @@ import java.util.List;
 
 import io.reactivex.Flowable;
 import io.reactivex.functions.Function;
+
 /**
  * Set up and use prepackaged files in assets.
  */
@@ -68,9 +69,12 @@ public class Assets {
         return res;
     }
 
-    public static <T> Flowable<T> flowAssets(Context ctx, String suffix, Function<InputStream, T> decoder) {
+    public static <T> List<T> listAssets(Context ctx, String suffix, Function<InputStream, T> decoder) {
         List<String> fnames = getAssetFileNames(ctx, suffix);
-        return Flowable.fromIterable(loadAssets(ctx.getAssets(), fnames, decoder));
+        return loadAssets(ctx.getAssets(), fnames, decoder);
+    }
+    public static <T> Flowable<T> flowAssets(Context ctx, String suffix, Function<InputStream, T> decoder) {
+        return Flowable.fromIterable(listAssets(ctx, suffix, decoder));
     }
 
 }

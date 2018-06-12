@@ -19,9 +19,8 @@ import static io.fotoapparat.selector.LensPositionSelectorsKt.back;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
-import io.reactivex.FlowableTransformer;
 import io.reactivex.Observable;
-import io.reactivex.schedulers.Schedulers;
+import io.reactivex.functions.Function;
 import io.reactivex.subjects.CompletableSubject;
 
 
@@ -57,7 +56,7 @@ public class Camera {
      * @param permission - completable obtaining CAMERA permission
      * @return a stream of frames grabbed by Fotoapparat
      */
-    public static Flowable<Bitmap> getFeed(
+    public static Flowable<Frame> getFeed(
             AppCompatActivity act, CameraView preview, Completable permission) {
 
         Observable<Frame> obs = Observable.create(emitter -> {
@@ -76,11 +75,7 @@ public class Camera {
         });
         return permission
                 .andThen(obs)
-                .toFlowable(BackpressureStrategy.LATEST)
-                .observeOn(Schedulers.computation(), false, 1)
-                .doOnNext(__ -> {Log.wtf(TAG, "TICK! " + Thread.currentThread().getName());})
-                .compose(Utils.yuv2bmp())
-                .compose(Utils.bmpRotate(90));
+                .toFlowable(BackpressureStrategy.LATEST);
     }
 
     /**
@@ -89,43 +84,17 @@ public class Camera {
      * @param h - desired height
      * @return return new bitmap flowable
      */
-    public static FlowableTransformer<Bitmap, Bitmap> centerCropTo(int w, int h) {
-        return upstream ->
-                upstream
-                .map(bmp -> {
-                    int upper = (bmp.getHeight() - h)/2;
-                    int left = (bmp.getWidth() - w)/2;
-                    return Bitmap.createBitmap(bmp, left, upper, w, h);
-                });
+    public static Function<Bitmap, Bitmap> centerCropTo(int w, int h) {
+        return bmp -> {
+            int upper = (bmp.getHeight() - h)/2;
+            int left = (bmp.getWidth() - w)/2;
+            return Bitmap.createBitmap(bmp, left, upper, w, h);
+        };
     }
 
-    public static FlowableTransformer<Bitmap, Bitmap> scaleTo(int w, int h) {
-        return upstream ->
-                upstream
-                .map(bmp -> {
-                    return Bitmap.createScaledBitmap(bmp, w, h, true);
-                });
+    public static Function<Bitmap, Bitmap> scaleTo(int w, int h) {
+        return bmp -> Bitmap.createScaledBitmap(bmp, w, h, true);
     }
 
-    /**
-     * Simple IIR filter. Gain of 1.
-     * @param vectorSize - number of dimensions to filter
-     * @param discount - the pole of the IIR filter
-     * @return filtered vector
-     */
-    public static FlowableTransformer<float[], float[]> lpf(int vectorSize, float discount) {
-        return upstream -> Flowable.defer(() -> {
-            float[] acc = new float[vectorSize]; // state
-            return upstream.map(sample -> {
-                float[] res = new float[vectorSize]; // result
-
-                for(int i=0; i<vectorSize; i++) {
-                    acc[i] = acc[i]*discount + sample[i];
-                    res[i] = (1-discount) * acc[i]; // DC gain
-                }
-                return res;
-            });
-        });
-    }
 
 }

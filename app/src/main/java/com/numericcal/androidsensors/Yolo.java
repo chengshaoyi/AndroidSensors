@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.List;
 
 import io.reactivex.FlowableTransformer;
+import io.reactivex.functions.Function;
 
 import static java.lang.Float.compare;
 
@@ -86,11 +87,11 @@ public class Yolo {
     }
 
     /**
-     * Preprocessing transformer. Normalizes image data to [0.0, 1.0] range and aligns it in memory
+     * Preprocessing for YOLOv2. Normalizes image data to [0.0, 1.0] range and aligns it in memory
      * in NHWC.BGR order.
      * @return float[] representation of the input image
      */
-    public static FlowableTransformer<Bitmap, float[]> v2Normalize() {
+    public static Function<Bitmap, float[]> v2Normalize() {
         return Utils.bmpToFloat_HWC_BGR(0, 255.0f);
     }
 
@@ -102,23 +103,21 @@ public class Yolo {
      * @param C - classes detected per box
      * @return
      */
-    public static FlowableTransformer<float[], List<CellBoxes>> splitCells(int S, int B, int C) {
-        return upstream ->
-                upstream
-                .map(tensor -> {
-                    int dataPerCell = (5 + C) * B;
-                    int dataPerRow = S * dataPerCell; // S cells, B boxes/cell, 5+C floats/box
-                    List<CellBoxes> lst = new ArrayList<>();
+    public static Function<float[], List<CellBoxes>> splitCells(int S, int B, int C) {
+        return tensor -> {
+            int dataPerCell = (5 + C) * B;
+            int dataPerRow = S * dataPerCell; // S cells, B boxes/cell, 5+C floats/box
+            List<CellBoxes> lst = new ArrayList<>();
 
-                    for(int row=0; row<S; row++) {
-                        for(int col=0; col<S; col++) {
-                            int offset = row * dataPerRow + col * dataPerCell;
+            for(int row=0; row<S; row++) {
+                for(int col=0; col<S; col++) {
+                    int offset = row * dataPerRow + col * dataPerCell;
 
-                            lst.add(new CellBoxes((float) col, (float) row, S, B, C, tensor, offset, offset + dataPerCell));
-                        }
-                    }
-                    return lst;
-                });
+                    lst.add(new CellBoxes((float) col, (float) row, S, B, C, tensor, offset, offset + dataPerCell));
+                }
+            }
+            return lst;
+        };
     }
 
     /**
@@ -130,55 +129,53 @@ public class Yolo {
      * @param scaleH - height scaling (DNN parameter)
      * @return
      */
-    public static FlowableTransformer<List<CellBoxes>, List<BBox>> thresholdAndBox(
+    public static Function<List<CellBoxes>, List<BBox>> thresholdAndBox(
             float threshold, List<AnchorBox> anchors, float scaleW, float scaleH) {
-        return upstream ->
-                upstream
-                .map(cbList -> {
-                    List<BBox> highConfidenceBoxes = new ArrayList<>();
+        return cbList -> {
+            List<BBox> highConfidenceBoxes = new ArrayList<>();
 
-                    // run across all cells of the frame
-                    for(int c=0; c<cbList.size(); c++) { // TODO: rewrite as foreach
-                        CellBoxes cb = cbList.get(c);
-                        // run accross all boxes in a cell
-                        for(int b=0; b<cb.B; b++) {
+            // run across all cells of the frame
+            for(int c=0; c<cbList.size(); c++) { // TODO: rewrite as foreach
+                CellBoxes cb = cbList.get(c);
+                // run accross all boxes in a cell
+                for(int b=0; b<cb.B; b++) {
 
-                            int offset = cb.startOffset + (5 + cb.C) * b;
-                            float[] predictions = new float[cb.C]; // move this out to avoid allocation per box * frame!
+                    int offset = cb.startOffset + (5 + cb.C) * b;
+                    float[] predictions = new float[cb.C]; // move this out to avoid allocation per box * frame!
 
-                            Utils.softmax(cb.C, offset + 5, cb.arr, 0, predictions);
-                            int maxClass = Utils.argmax(predictions, 0, cb.C);
+                    Utils.softmax(cb.C, offset + 5, cb.arr, 0, predictions);
+                    int maxClass = Utils.argmax(predictions, 0, cb.C);
 
-                            float objectConfidence = Utils.sigmoidS(cb.arr[offset + 4]);
+                    float objectConfidence = Utils.sigmoidS(cb.arr[offset + 4]);
 
-                            float confidence = predictions[maxClass] * objectConfidence;
+                    float confidence = predictions[maxClass] * objectConfidence;
 
-                            if (confidence > threshold) { // is confidence high enough?
-                                AnchorBox anchor = anchors.get(b);
+                    if (confidence > threshold) { // is confidence high enough?
+                        AnchorBox anchor = anchors.get(b);
 
-                                float tx = cb.arr[offset + 0];
-                                float ty = cb.arr[offset + 1];
-                                float tw = cb.arr[offset + 2];
-                                float th = cb.arr[offset + 3];
+                        float tx = cb.arr[offset + 0];
+                        float ty = cb.arr[offset + 1];
+                        float tw = cb.arr[offset + 2];
+                        float th = cb.arr[offset + 3];
 
-                                float centerX = (cb.x + Utils.sigmoidS(tx)) * scaleW;
-                                float centerY = (cb.y + Utils.sigmoidS(ty)) * scaleH;
+                        float centerX = (cb.x + Utils.sigmoidS(tx)) * scaleW;
+                        float centerY = (cb.y + Utils.sigmoidS(ty)) * scaleH;
 
-                                float roiW = (float) Math.exp(tw) * anchor.width * scaleW;
-                                float roiH = (float) Math.exp(th) * anchor.height * scaleH;
+                        float roiW = (float) Math.exp(tw) * anchor.width * scaleW;
+                        float roiH = (float) Math.exp(th) * anchor.height * scaleH;
 
-                                int left = (int) (centerX - roiW/2.0);  // coords (x->right, y->down)
-                                int right = (int) (centerX + roiW/2.0);
-                                int bottom = (int) (centerY + roiH/2.0);
-                                int top = (int) (centerY - roiH/2.0);
+                        int left = (int) (centerX - roiW/2.0);  // coords (x->right, y->down)
+                        int right = (int) (centerX + roiW/2.0);
+                        int bottom = (int) (centerY + roiH/2.0);
+                        int top = (int) (centerY - roiH/2.0);
 
-                                highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, confidence));
-                            }
-                        }
+                        highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, confidence));
                     }
+                }
+            }
 
-                    return highConfidenceBoxes;
-                });
+            return highConfidenceBoxes;
+        };
     }
 
     /**
@@ -214,28 +211,26 @@ public class Yolo {
         return intersection / (area(x) + area(y) - intersection);
     }
 
-    public static FlowableTransformer<List<BBox>, List<BBox>> suppressNonMax(float thresholdIoU) {
-        return upstream ->
-                upstream
-                .map(bBoxes -> {
-                    List<BBox> boxes = new ArrayList<>();
+    public static Function<List<BBox>, List<BBox>> suppressNonMax(float thresholdIoU) {
+        return bBoxes -> {
+            List<BBox> boxes = new ArrayList<>();
 
-                    if (bBoxes.size() > 0) {
-                        Collections.sort(bBoxes, (b1,b2) -> compare(b2.confidence, b1.confidence));
-                        boxes.add(bBoxes.get(0));
-                        bBoxes.remove(0);
+            if (bBoxes.size() > 0) {
+                Collections.sort(bBoxes, (b1,b2) -> compare(b2.confidence, b1.confidence));
+                boxes.add(bBoxes.get(0));
+                bBoxes.remove(0);
 
-                        for (BBox newBox: bBoxes) {
-                            boolean newDetection = true;
-                            for (BBox detectedBox: boxes) {
-                                if (iou(newBox, detectedBox) > thresholdIoU) newDetection = false;;
-                            }
-                            if (newDetection) boxes.add(newBox); // does not overlap with others too much, add it
-                        }
+                for (BBox newBox: bBoxes) { // k^2
+                    boolean newDetection = true;
+                    for (BBox detectedBox: boxes) {
+                        if (iou(newBox, detectedBox) > thresholdIoU) newDetection = false;;
                     }
+                    if (newDetection) boxes.add(newBox); // does not overlap with others too much, add it
+                }
+            }
 
-                    return boxes;
-                });
+            return boxes;
+        };
     }
 
     /**

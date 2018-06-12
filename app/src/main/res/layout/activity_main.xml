@@ -7,46 +7,6 @@
     tools:context=".MainActivity"
     tools:layout_editor_absoluteY="81dp">
 
-    <!--
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Hello World!" />
-
-    <FrameLayout
-        android:id="@+id/frameView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:visibility="visible"
-        app:layout_constraintVertical_weight="1">
-
-        <io.fotoapparat.view.CameraView
-            android:id="@+id/cameraView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <ImageView
-            android:id="@+id/overlayView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-        <ImageView
-            android:id="@+id/extraOverlay"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-    </FrameLayout>
-
-    <ImageView
-        android:id="@+id/dbgView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="visible"
-        app:layout_constraintVertical_weight="1"/>
-
-    -->
-
     <FrameLayout
         android:id="@+id/viewArea"
         android:layout_width="match_parent"
@@ -95,11 +55,20 @@
             android:layout_height="wrap_content"
             android:text="Hello, World!" />
 
+        <TableLayout
+            android:id="@+id/tableLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/statusText"
+            android:stretchColumns="*">
+
+        </TableLayout>
+
         <ImageView
             android:id="@+id/dbgView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@+id/statusText"
+            android:layout_below="@+id/tableLayout"
             app:srcCompat="@android:color/holo_purple" />
     </RelativeLayout>
 </android.support.constraint.ConstraintLayout>

@@ -3,6 +3,9 @@ package com.numericcal.androidsensors;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 
+/**
+ * Convenience functions for working with ImageView overlays.
+ */
 public class Overlay {
 
     public static class Line {

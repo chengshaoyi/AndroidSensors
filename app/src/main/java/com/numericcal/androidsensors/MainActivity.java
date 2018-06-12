@@ -8,7 +8,11 @@ import android.graphics.PorterDuff;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.Pair;
+import android.view.View;
 import android.widget.ImageView;
+import android.widget.TableLayout;
+import android.widget.TableRow;
 import android.widget.TextView;
 
 import com.tbruyelle.rxpermissions2.RxPermissions;
@@ -19,6 +23,7 @@ import io.fotoapparat.view.CameraView;
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.schedulers.Schedulers;
 
 import com.numericcal.edge.Dnn;
 
@@ -26,6 +31,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static com.numericcal.androidsensors.Tags.combine;
+import static com.numericcal.androidsensors.Tags.extract;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
@@ -36,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int TOP_LABELS = 3;
 
     TextView statusText;
+    TableLayout tableLayout;
     CameraView cameraView;
 
     RxPermissions rxPerm;
@@ -54,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         statusText = (TextView) findViewById(R.id.statusText);
+        tableLayout = (TableLayout) findViewById(R.id.tableLayout);
         cameraView = (CameraView) findViewById(R.id.cameraView);
 
         rxPerm = new RxPermissions(this);
@@ -112,48 +122,63 @@ public class MainActivity extends AppCompatActivity {
                     float scaleWidth = (float) bmpOverlay.getWidth() / inputWidth;
                     float scaleHeight = (float) bmpOverlay.getHeight() / inputHeight;
 
-                    Log.wtf(TAG, "overlay w/h: " + overlayView.getWidth() + " x " + overlayView.getHeight());
-                    Log.wtf(TAG, "extra w/h: " + extraOverlay.getWidth() + " x " + extraOverlay.getHeight());
-
-                    Log.wtf(TAG, "scaling: " + scaleWidth + " x " + scaleHeight);
-
-                    //// Camera.getFeed(this, cameraView, camPerm)
-
+                    //return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(), Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream))
                     return Camera.getFeed(this, cameraView, camPerm)
-                            //Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(),
-                            //        Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream))
-                            //        .delay(5, TimeUnit.SECONDS)
-                            .compose(Camera.scaleTo(inputWidth, inputHeight))
-                            .compose(Yolo.v2Normalize())
-                            .onBackpressureLatest()
-                            .doOnNext(__ -> {
-                                Log.wtf(TAG, "TOC");
-                            })
-                            .compose(yolo.runInference())
-                            .doOnNext(__ -> {
-                                Log.wtf(TAG, "BOC");
-                            })
-                            .compose(Yolo.splitCells(S, B, C))
-                            .compose(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY))
-                            .compose(Yolo.suppressNonMax(0.3f))
+                            .observeOn(Schedulers.computation(), false, 1)
+                            .map(Tags.srcTag("assets"))
+                            .compose(Utils.mkFT(Utils.yuv2bmp(), extract(), combine("yuv2bmp")))
+                            .compose(Utils.mkFT(Utils.bmpRotate(90), extract(), combine("rotate")))
+                            .compose(Utils.mkFT(Camera.scaleTo(inputWidth, inputHeight), extract(), combine("scaling")))
+                            .compose(Utils.mkFT(Yolo.v2Normalize(), extract(), combine("normalize")))
+                            .compose(yolo.runInference(extract(), combine("inference")))
+                            .compose(Utils.mkFT(Yolo.splitCells(S, B, C), extract(), combine("splitcells")))
+                            .compose(Utils.mkFT(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY), extract(), combine("threshold")))
+                            .compose(Utils.mkFT(Yolo.suppressNonMax(0.3f), extract(), combine("suppress")))
                             .observeOn(AndroidSchedulers.mainThread(), false, 1)
                             .doOnNext(boxList -> {
-                                Log.wtf(TAG, "After cleanup " + boxList.size() + " boxes! " + Thread.currentThread().getName());
                                 canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-
-                                for(int i=0; i<boxList.size(); i++) {
-                                    Yolo.BBox bbox = boxList.get(i);
-                                    Log.wtf(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
-
+                                for (Yolo.BBox bbox: boxList.token) {
                                     Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight), new Overlay.Line(Color.RED, 2.0f), canvasOverlay);
+                                    Log.i(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
                                 }
                                 extraOverlay.setImageBitmap(bmpOverlay);
                             });
                 })
+                .compose(Utils.mkFT(Utils.lpfTT(0.95f)))
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
-                .subscribe();
+                .subscribe(this::populateTable, err -> { err.printStackTrace(); });
 
+    }
+    private void populateTable(List<Pair<String, Float>> tbl) {
+        int cnt = 0;
+        tableLayout.removeAllViews();
+
+        for (Pair<String, Float> p: tbl) {
+            TableRow row = new TableRow(this);
+            TableRow.LayoutParams lp = new TableRow.LayoutParams(TableRow.LayoutParams.WRAP_CONTENT);
+            row.setLayoutParams(lp);
+
+            TextView key = new TextView(this);
+            key.setText(p.first);
+            key.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+            TableRow.LayoutParams keyLPs = new TableRow.LayoutParams();
+            keyLPs.weight = 1.0f;
+            key.setLayoutParams(keyLPs);
+
+            TextView val = new TextView(this);
+            val.setText(p.second.toString());
+            val.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
+            TableRow.LayoutParams valLPs = new TableRow.LayoutParams();
+            valLPs.weight = 1.0f;
+            val.setLayoutParams(valLPs);
+
+            row.addView(key);
+            row.addView(val);
+
+            tableLayout.addView(row, cnt);
+            cnt += 1;
+        }
     }
 
     @Override
