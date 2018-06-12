@@ -21,6 +21,7 @@ import io.reactivex.Completable;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.CompletableSubject;
 
 
@@ -75,6 +76,7 @@ public class Camera {
         });
         return permission
                 .andThen(obs)
+                .subscribeOn(Schedulers.io())
                 .toFlowable(BackpressureStrategy.LATEST);
     }
 

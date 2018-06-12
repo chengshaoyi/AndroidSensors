@@ -122,12 +122,9 @@ public class MainActivity extends AppCompatActivity {
                     float scaleWidth = (float) bmpOverlay.getWidth() / inputWidth;
                     float scaleHeight = (float) bmpOverlay.getHeight() / inputHeight;
 
-                    //return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(), Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream))
-                    return Camera.getFeed(this, cameraView, camPerm)
+                    //return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(), Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream)).map(Tags.srcTag("assets"))
+                    return Camera.getFeed(this, cameraView, camPerm).map(Tags.srcTag("camera")).compose(Utils.mkFT(Utils.yuv2bmp(), extract(), combine("yuv2bmp"))).compose(Utils.mkFT(Utils.bmpRotate(90), extract(), combine("rotate")))
                             .observeOn(Schedulers.computation(), false, 1)
-                            .map(Tags.srcTag("assets"))
-                            .compose(Utils.mkFT(Utils.yuv2bmp(), extract(), combine("yuv2bmp")))
-                            .compose(Utils.mkFT(Utils.bmpRotate(90), extract(), combine("rotate")))
                             .compose(Utils.mkFT(Camera.scaleTo(inputWidth, inputHeight), extract(), combine("scaling")))
                             .compose(Utils.mkFT(Yolo.v2Normalize(), extract(), combine("normalize")))
                             .compose(yolo.runInference(extract(), combine("inference")))
@@ -150,6 +147,7 @@ public class MainActivity extends AppCompatActivity {
                 .subscribe(this::populateTable, err -> { err.printStackTrace(); });
 
     }
+
     private void populateTable(List<Pair<String, Float>> tbl) {
         int cnt = 0;
         tableLayout.removeAllViews();
