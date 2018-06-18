@@ -8,16 +8,16 @@ import android.graphics.Paint;
  */
 public class Overlay {
 
-    public static class Line {
+    public static class LineStyle {
         int color;
         float width;
-        Line(int color, float width) {
+        LineStyle(int color, float width) {
             this.color = color;
             this.width = width;
         }
     }
 
-    public static void drawBox(Yolo.BBox box, Line line, Canvas canvas) {
+    public static void drawBox(Yolo.BBox box, LineStyle line, Canvas canvas) {
         Paint paint = new Paint();
 
         paint.setColor(line.color);

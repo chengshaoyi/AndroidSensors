@@ -12,11 +12,16 @@ import android.util.Pair;
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import io.fotoapparat.preview.Frame;
+import io.reactivex.BackpressureOverflowStrategy;
 import io.reactivex.FlowableTransformer;
+import io.reactivex.ObservableTransformer;
 import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Function;
+import io.reactivex.subjects.BehaviorSubject;
+import io.reactivex.subjects.PublishSubject;
 
 /**
  * Helper functions.
@@ -31,11 +36,15 @@ public class Utils {
      */
     public static List<Long> diff(List<Long> data) {
         List<Long> res = new ArrayList<>();
+        res.add(0L); // assume source takes 0
+
         for(int i=1; i<data.size(); i++) {
             res.add(data.get(i) - data.get(i-1));
         }
         return res;
     }
+
+
 
     /**
      * A simple printer for arrays during debugging.
@@ -186,7 +195,7 @@ public class Utils {
     public static <F,R,Q,T> FlowableTransformer<F,T> mkFT(
             Function<R,Q> processor, Function<F,R> extractor, BiFunction<F,Q,T> combiner) {
         return upstream ->
-                upstream
+                upstream.onBackpressureBuffer(1, () -> Log.wtf(TAG, "dropping!"), BackpressureOverflowStrategy.DROP_OLDEST)
                 .map(input -> combiner.apply(input, processor.apply(extractor.apply(input))));
     }
 
@@ -194,6 +203,42 @@ public class Utils {
         return mkFT(processor, (F x) -> x, (__,y) -> y);
     }
 
+    /**
+     * Create a flowable transformer from pre-processing, processing, post-processing.
+     * @param processor - the actual work
+     * @param separator - pre-processor
+     * @param combiner - post-processor
+     * @return
+     */
+    public static <F,S,R,Q,T> ObservableTransformer<F,T> mkOT(
+            Function<R,Q> processor,
+            Function<F,Pair<S,R>> separator,
+            Function<Pair<S,Q>,T> combiner) {
+        return upstream ->
+                upstream
+                        .map(input -> {
+                            Pair<S,R> sr = separator.apply(input);
+                            Q q = processor.apply(sr.second);
+                            return combiner.apply(new Pair<>(sr.first, q));
+                        });
+    }
+
+    /**
+     * Simplified version with default pre/post processor.
+     */
+    public static <F,T> ObservableTransformer<F,T> mkOT(
+            Function<F,T> processor) {
+        return upstream ->
+                upstream
+                        .map(processor::apply);
+    }
+
+    /**
+     * A function with associated state.
+     * @param <R>
+     * @param <S>
+     * @param <Q>
+     */
     public static abstract class Actor<R,S,Q> implements Function<R,Q> {
         S state;
         @Override
@@ -324,19 +369,19 @@ public class Utils {
      * @param <T>
      * @return
      */
-    public static <T> Utils.Actor<Tags.TTok<T>, List<Float>, List<Pair<String, Float>>> lpfTT(float discount) {
-        return new Actor<Tags.TTok<T>, List<Float>, List<Pair<String, Float>>>(new ArrayList<>()) {
+    public static <T> Utils.Actor<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>
+    lpfTT(float discount) {
+        return new Actor<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>(new ArrayList<>()) {
             @Override
-            public List<Pair<String, Float>> apply(Tags.TTok<T> arg) {
+            public Pair<Tags.TTok<T>,List<Pair<String, Float>>> apply(Tags.TTok<T> arg) {
                 List<Float> filtered = new ArrayList<>();
-                List<Long> diffs = diff(arg.timestamps);
-                arg.tags.remove(0);
+                List<Long> diffs = diff(arg.md.exitTimes);
 
                 int idxOverlap = Math.min(state.size(), diffs.size());
                 int idxMax = Math.max(state.size(), diffs.size());
 
                 for(int i=0; i<idxOverlap; i++) {
-                    filtered.add(state.get(i) * discount + diffs.get(i));
+                    filtered.add(state.get(i) * discount + (1-discount) * diffs.get(i));
                 }
 
                 if (state.size() < diffs.size()) {
@@ -345,9 +390,19 @@ public class Utils {
                     }
                 }
 
-                return zip(arg.tags, filtered);
+                state = filtered; // update state
+
+                return new Pair<>(arg, zip(merge(arg.md.tags, arg.md.threads), filtered));
             }
         };
+    }
+
+    public static List<String> merge(List<String> xs, List<String> ys) {
+        List<String> lst = new ArrayList<>();
+        for(int i=0; i<Math.min(xs.size(), ys.size()); i++) {
+            lst.add(xs.get(i) + " " + ys.get(i));
+        }
+        return lst;
     }
 
     public static String printPairs(List<Pair<String, Float>> z) {
@@ -357,5 +412,33 @@ public class Utils {
         }
         return s.toString();
     }
+
+    static Long maxLatency(Tags.MetaData md) {
+        Long res = 0L;
+        Long lat = 0L;
+        List<Long> entries = md.entryTimes;
+        List<Long> exits = md.exitTimes;
+
+        for(int i=0; i<Math.min(entries.size(), exits.size()); i++) {
+            lat = exits.get(i) - entries.get(i);
+            if (lat > res) {
+                res = lat;
+            }
+        }
+        return res+2L;
+    }
+
+    static void updateLatency(Long newLat, AtomicLong oldLat,
+                              Long thresholdLat, BehaviorSubject<Long> ps) {
+        Long currLat = oldLat.get();
+
+        if (newLat > currLat || newLat < currLat - thresholdLat) {
+            oldLat.set(newLat);
+            ps.onNext(newLat);
+        }
+
+    }
+
+
 
 }

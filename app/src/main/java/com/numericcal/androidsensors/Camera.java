@@ -16,9 +16,7 @@ import io.fotoapparat.preview.Frame;
 import io.fotoapparat.view.CameraView;
 import static io.fotoapparat.selector.LensPositionSelectorsKt.back;
 
-import io.reactivex.BackpressureStrategy;
 import io.reactivex.Completable;
-import io.reactivex.Flowable;
 import io.reactivex.Observable;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
@@ -57,7 +55,7 @@ public class Camera {
      * @param permission - completable obtaining CAMERA permission
      * @return a stream of frames grabbed by Fotoapparat
      */
-    public static Flowable<Frame> getFeed(
+    public static Observable<Frame> getFeed(
             AppCompatActivity act, CameraView preview, Completable permission) {
 
         Observable<Frame> obs = Observable.create(emitter -> {
@@ -76,8 +74,7 @@ public class Camera {
         });
         return permission
                 .andThen(obs)
-                .subscribeOn(Schedulers.io())
-                .toFlowable(BackpressureStrategy.LATEST);
+                .subscribeOn(Schedulers.io());
     }
 
     /**
