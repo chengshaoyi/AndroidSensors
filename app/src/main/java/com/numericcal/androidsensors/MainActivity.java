@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -23,10 +24,8 @@ import io.reactivex.Completable;
 import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 
-import hu.akarnokd.rxjava2.operators.ObservableTransformers;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.BehaviorSubject;
-import io.reactivex.subjects.PublishSubject;
 
 import com.numericcal.edge.Dnn;
 
@@ -35,6 +34,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import hu.akarnokd.rxjava2.operators.ObservableTransformers;
 
 import static com.numericcal.androidsensors.Tags.combine;
 import static com.numericcal.androidsensors.Tags.extract;
@@ -93,12 +94,16 @@ public class MainActivity extends AppCompatActivity {
                 Dnn.configBuilder
                         .fromAccount("MLDeployer")
                         .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
-                        .getModelFromCollection("tinyYolo2Deploy-by-MLDeployer"))
+                        .getModelFromCollection("ncclYOLO"))
+                        //.getModelFromCollection("tinyYolo2LiteDeploy-by-MLDeployer"))
+                .observeOn(AndroidSchedulers.mainThread())
                 .flatMapObservable(yolo -> {
 
                     /** BEGIN MODEL PARAM SECTION **/
-                    int inputWidth = yolo.info.inputShape().get(1);
-                    int inputHeight = yolo.info.inputShape().get(2);
+                    int inputWidth = yolo.info.inputShape.get(1);
+                    int inputHeight = yolo.info.inputShape.get(2);
+
+                    statusText.setText("engine: " + yolo.info.engine);
 
                     /** NOTE: this should be yolo.params.get("S"), yolo.params.get("C") or something alike **/
                     int S = 13;
@@ -130,43 +135,48 @@ public class MainActivity extends AppCompatActivity {
 
                     /** Set up auto-adjusting pipeline **/
                     Long latencyThreshold = 10L;
-                    Observable<Long> drumbeat = newInterval
+                    Observable<Long> xxx = newInterval
                             .switchMap(currentInterval -> Observable.interval(currentInterval, TimeUnit.MILLISECONDS));
+                    Observable<Long> drumbeat = Observable.interval(500L, TimeUnit.MILLISECONDS);
+
+                    Long epoch = System.currentTimeMillis();
 
                     //return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(), Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream)).map(Tags.srcTag("assets"))
-                    Observable<Tags.TTok<List<Yolo.BBox>>> stream =
-                            Camera.getFeed(this, cameraView, camPerm)
+                    Observable<Tags.TTok<List<Yolo.BBox>>> stream = Camera.getFeed(this, cameraView, camPerm)
                             .sample(drumbeat)
                             .map(Tags.srcTag("camera"))
+                            .observeOn(Schedulers.computation())
                             .compose(Utils.mkOT(Utils.yuv2bmp(), extract(), combine("yuv2bmp"))).compose(Utils.mkOT(Utils.bmpRotate(90), extract(), combine("rotate")))
+                            .observeOn(Schedulers.computation())
                             .compose(Utils.mkOT(Camera.scaleTo(inputWidth, inputHeight), extract(), combine("scaling")))
+                            .observeOn(Schedulers.computation())
                             .compose(Utils.mkOT(Yolo.v2Normalize(), extract(), combine("normalize")))
                             .compose(yolo.runInference(extract(), combine("inference")))
                             .compose(Utils.mkOT(Yolo.splitCells(S, B, C), extract(), combine("splitcells")))
-                            .compose(Utils.mkOT(Yolo.thresholdAndBox(0.3f, anchors, scaleX, scaleY), extract(), combine("threshold")))
+                            .compose(Utils.mkOT(Yolo.thresholdAndBox(0.3f, anchors, labels, scaleX, scaleY), extract(), combine("threshold")))
                             .compose(Utils.mkOT(Yolo.suppressNonMax(0.3f), extract(), combine("suppress")))
                             .observeOn(AndroidSchedulers.mainThread(), false, 1)
                             .doOnNext(boxList -> {
                                 canvasOverlay.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
                                 for (Yolo.BBox bbox: boxList.token) {
-                                    Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight), new Overlay.LineStyle(Color.RED, 2.0f), canvasOverlay);
-                                    Log.i(TAG, "\t " + bbox + " " + labels.get(bbox.maxClassArg));
+                                    Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight), new Overlay.LineStyle(Color.GREEN, 2.0f), canvasOverlay);
+                                    Log.i(TAG, "\t " + bbox + " " + bbox.label);
                                 }
                                 extraOverlay.setImageBitmap(bmpOverlay);
 
                                 // debug
                                 //Log.wtf(TAG, "tags: " + boxList.md.tags);
-
+                                Log.wtf(TAG, Utils.ttokReport(boxList, epoch));
                                 // update sampling period (assuming latencies are stable)
                                 Tags.MetaData md = boxList.md;
                                 Long maxLat = Utils.maxLatency(md);
+                                Log.wtf(TAG, "latency: " + maxLat);
                                 Utils.updateLatency(maxLat, samplingPeriod, latencyThreshold, newInterval);
                             });
 
                     return stream;
                 })
                 .compose(Utils.mkOT(Utils.lpfTT(0.90f)))
-                .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
                 .subscribe(this::populateTable, err -> { err.printStackTrace(); });
 
@@ -194,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
             key.setLayoutParams(keyLPs);
 
             TextView val = new TextView(this);
-            val.setText(new Long(Math.round(p.second)).toString());
+            val.setText(Long.valueOf(Math.round(p.second)).toString());
             val.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END);
             TableRow.LayoutParams valLPs = new TableRow.LayoutParams();
             valLPs.weight = 1.0f;

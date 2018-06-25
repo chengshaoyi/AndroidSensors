@@ -29,5 +29,8 @@ public class Overlay {
         canvas.drawLine(box.right, box.top, box.right, box.bottom, paint);
         canvas.drawLine(box.right, box.top, box.left, box.top, paint);
 
+        paint.setTextSize(30.0f);
+        canvas.drawText(box.label, box.left, box.top, paint);
+
     }
 }

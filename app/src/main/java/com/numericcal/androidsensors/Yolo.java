@@ -59,14 +59,16 @@ public class Yolo {
 
         int maxClassArg;
         float confidence;
+        String label;
 
-        BBox(int bottom, int top, int left, int right, int maxClassArg, float confidence) {
+        BBox(int bottom, int top, int left, int right, int maxClassArg, String label, float confidence) {
             this.bottom = bottom;
             this.top = top;
             this.left = left;
             this.right = right;
 
             this.maxClassArg = maxClassArg;
+            this.label = label;
             this.confidence = confidence;
         }
 
@@ -130,7 +132,7 @@ public class Yolo {
      * @return
      */
     public static Function<List<CellBoxes>, List<BBox>> thresholdAndBox(
-            float threshold, List<AnchorBox> anchors, float scaleW, float scaleH) {
+            float threshold, List<AnchorBox> anchors, List<String> labels, float scaleW, float scaleH) {
         return cbList -> {
             List<BBox> highConfidenceBoxes = new ArrayList<>();
 
@@ -169,7 +171,7 @@ public class Yolo {
                         int bottom = (int) (centerY + roiH/2.0);
                         int top = (int) (centerY - roiH/2.0);
 
-                        highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, confidence));
+                        highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, labels.get(maxClass), confidence));
                     }
                 }
             }
@@ -206,7 +208,7 @@ public class Yolo {
             return 0.0f;
         }
 
-        float intersection = area(new BBox(bottom, top, left, right, 0, 0.0f)); // dummy maxClassArg/confidence
+        float intersection = area(new BBox(bottom, top, left, right, 0, "", 0.0f)); // dummy maxClassArg/confidence
 
         return intersection / (area(x) + area(y) - intersection);
     }
@@ -242,6 +244,6 @@ public class Yolo {
      */
     public static BBox rescaleBBoxBy(BBox b, float stretchWidth, float stretchHeight) {
         return new BBox( Math.round(b.bottom * stretchHeight), Math.round(b.top * stretchHeight),
-                Math.round(b.left * stretchWidth), Math.round(b.right * stretchWidth), b.maxClassArg, b.confidence);
+                Math.round(b.left * stretchWidth), Math.round(b.right * stretchWidth), b.maxClassArg, b.label, b.confidence);
     }
 }

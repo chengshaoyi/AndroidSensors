@@ -11,7 +11,9 @@ import android.util.Pair;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.fotoapparat.preview.Frame;
@@ -44,7 +46,23 @@ public class Utils {
         return res;
     }
 
+    public static <T> String ttokReport(Tags.TTok<T> ttok, Long epoch) {
+        StringBuilder str = new StringBuilder();
+        List<Long> diffs = diff(ttok.md.exitTimes);
 
+        str.append("--- NEW FRAME ---");
+        str.append(String.format("epoch: %6d\n", ttok.md.entryTimes.get(0) - epoch));
+        for(int i=0; i<ttok.md.tags.size(); i++) {
+            str.append(String.format("%15s ", ttok.md.tags.get(i)));
+            str.append(String.format("thread: %30s | ", ttok.md.threads.get(i)));
+            str.append(String.format("entry: %6d | ", ttok.md.entryTimes.get(i) - epoch));
+            str.append(String.format("exit: %6d | ", ttok.md.exitTimes.get(i) - epoch));
+            str.append(String.format("stage: %6d | ", ttok.md.exitTimes.get(i) - ttok.md.entryTimes.get(i)));
+            str.append(String.format("handoff: %6d\n", diffs.get(i)));
+        }
+
+        return str.toString();
+    }
 
     /**
      * A simple printer for arrays during debugging.
@@ -413,19 +431,37 @@ public class Utils {
         return s.toString();
     }
 
+    /**
+     * Group timings for each thread and pick the longest one that is assigned to a single thread.
+     * By setting resampling to that interval we should guarantee that buffers are not growing.
+     * @param md
+     * @return
+     */
     static Long maxLatency(Tags.MetaData md) {
-        Long res = 0L;
-        Long lat = 0L;
+        List<String> threads = md.threads;
         List<Long> entries = md.entryTimes;
         List<Long> exits = md.exitTimes;
 
-        for(int i=0; i<Math.min(entries.size(), exits.size()); i++) {
-            lat = exits.get(i) - entries.get(i);
-            if (lat > res) {
-                res = lat;
-            }
+        // initialize times for all threads
+        Map<String, Long> threadLats = new HashMap<>();
+        for (String thr: threads) {
+            threadLats.put(thr, 0L);
         }
-        return res+2L;
+        // calculate sums across stages for all threads
+        Long acc = 0L;
+        for(int i=0; i<threads.size(); i++) {
+            String thr = threads.get(i);
+            acc = threadLats.get(thr);
+            threadLats.put(thr, acc + exits.get(i) - entries.get(i));
+        }
+        // pick the longest time
+        Long res = 0L;
+        Long lat = 0L;
+        for (String thr: threads) {
+            lat = threadLats.get(thr);
+            if (lat > res) res = lat;
+        }
+        return (long) (res * 1.05f);
     }
 
     static void updateLatency(Long newLat, AtomicLong oldLat,
