@@ -1,6 +1,7 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
@@ -99,6 +100,8 @@ public class MainActivity extends AppCompatActivity {
                 .observeOn(AndroidSchedulers.mainThread())
                 .flatMapObservable(yolo -> {
 
+                    Utils.Actor<Bitmap, List<Bitmap>, Bitmap> frameGrabber = Utils.grabber(128);
+
                     /** BEGIN MODEL PARAM SECTION **/
                     int inputWidth = yolo.info.inputShape.get(1);
                     int inputHeight = yolo.info.inputShape.get(2);
@@ -137,20 +140,23 @@ public class MainActivity extends AppCompatActivity {
                     Long latencyThreshold = 10L;
                     Observable<Long> xxx = newInterval
                             .switchMap(currentInterval -> Observable.interval(currentInterval, TimeUnit.MILLISECONDS));
-                    Observable<Long> drumbeat = Observable.interval(500L, TimeUnit.MILLISECONDS);
+                    Observable<Long> drumbeat = Observable.interval(400L, TimeUnit.MILLISECONDS);
 
                     Long epoch = System.currentTimeMillis();
 
-                    //return Flowable.fromIterable(Assets.loadAssets(this.getApplicationContext().getAssets(), Arrays.asList("examples/dog.jpg", "examples/person.jpg"), BitmapFactory::decodeStream)).map(Tags.srcTag("assets"))
-                    Observable<Tags.TTok<List<Yolo.BBox>>> stream = Camera.getFeed(this, cameraView, camPerm)
+                    Observable<Tags.TTok<List<Yolo.BBox>>> stream =
+                            //Observable.fromIterable(Files.loadFromAssets(this.getApplicationContext(), Arrays.asList("examples/ranko1.in.jpg"), BitmapFactory::decodeStream))
+                            Camera.getFeed(this, cameraView, camPerm)
                             .sample(drumbeat)
+                            //.doOnNext(overlayView::setImageBitmap)
                             .map(Tags.srcTag("camera"))
                             .observeOn(Schedulers.computation())
                             .compose(Utils.mkOT(Utils.yuv2bmp(), extract(), combine("yuv2bmp"))).compose(Utils.mkOT(Utils.bmpRotate(90), extract(), combine("rotate")))
                             .observeOn(Schedulers.computation())
                             .compose(Utils.mkOT(Camera.scaleTo(inputWidth, inputHeight), extract(), combine("scaling")))
                             .observeOn(Schedulers.computation())
-                            .compose(Utils.mkOT(Yolo.v2Normalize(), extract(), combine("normalize")))
+                                    .compose(Utils.mkOT(frameGrabber, extract(), combine("framegrabber")))
+                                    .compose(Utils.mkOT(Yolo.v2Normalize(), extract(), combine("normalize")))
                             .compose(yolo.runInference(extract(), combine("inference")))
                             .compose(Utils.mkOT(Yolo.splitCells(S, B, C), extract(), combine("splitcells")))
                             .compose(Utils.mkOT(Yolo.thresholdAndBox(0.3f, anchors, labels, scaleX, scaleY), extract(), combine("threshold")))
@@ -162,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
                                     Overlay.drawBox(Yolo.rescaleBBoxBy(bbox, scaleWidth, scaleHeight), new Overlay.LineStyle(Color.GREEN, 2.0f), canvasOverlay);
                                     Log.i(TAG, "\t " + bbox + " " + bbox.label);
                                 }
+                                Overlay.drawBox(new Yolo.BBox(10, 300, 20, 200, 0, "abc", 1.0f), new Overlay.LineStyle(Color.BLUE, 3.0f), canvasOverlay);
                                 extraOverlay.setImageBitmap(bmpOverlay);
 
                                 // debug
@@ -174,7 +181,11 @@ public class MainActivity extends AppCompatActivity {
                                 Utils.updateLatency(maxLat, samplingPeriod, latencyThreshold, newInterval);
                             });
 
-                    return stream;
+                    return stream.doOnDispose(() -> {
+                        List<Bitmap> frames = frameGrabber.finish();
+                        Log.wtf(TAG, String.format("saving %d frames!!!", frames.size()));
+                        Utils.saveFrames(frames, this.getApplicationContext().getFilesDir() + "/frames/", "frame");
+                    });
                 })
                 .compose(Utils.mkOT(Utils.lpfTT(0.90f)))
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))

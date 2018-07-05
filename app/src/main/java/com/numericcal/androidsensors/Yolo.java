@@ -1,13 +1,11 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
-import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import io.reactivex.FlowableTransformer;
 import io.reactivex.functions.Function;
 
 import static java.lang.Float.compare;

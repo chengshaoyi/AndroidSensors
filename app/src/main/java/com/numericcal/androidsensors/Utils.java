@@ -10,7 +10,13 @@ import android.util.Log;
 import android.util.Pair;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -261,6 +267,9 @@ public class Utils {
         S state;
         @Override
         public abstract Q apply(R arg);
+        public S finish() {
+            return state;
+        }
         Actor(S init) {
             this.state = init;
         }
@@ -475,6 +484,49 @@ public class Utils {
 
     }
 
+    /**
+     * Log values as they pass by. Note that this is not NullPtr safe. We init with nulls and
+     * nulls might be present if we don't fill out lastN elements in the circular buffer.
+     * @param lastN - number of entries in the circular buffer
+     * @param <T>
+     * @return
+     */
+    public static <T> Actor<T, List<T>, T> grabber(int lastN) {
+        return new Actor<T, List<T>, T>(new ArrayList<>(Collections.nCopies(lastN, null))) {
+            int count = 0;
+            @Override
+            public T apply(T arg) {
+                // save bitmap
+                state.set(count, arg);
+                count = (count + 1) % lastN;
+                // return the same bitmap
+                return arg;
+            }
+        };
+    }
 
+    /**
+     * Save a list of bitmaps into a file. Checks for nulls.
+     * @param bmps - list of bitmaps to save
+     * @param dir - directory to use
+     * @param prefix - file prefix to use
+     * @throws IOException
+     */
+    static void saveFrames(List<Bitmap> bmps, String dir, String prefix) throws IOException{
+        // make sure dir exists
+        File dirFile = new File(dir);
+        dirFile.delete();
+        dirFile.mkdirs();
+
+        for(int i=0; i<bmps.size(); i++) {
+            if (bmps.get(i) != null) {
+                try (
+                        OutputStream os = new FileOutputStream(dir + prefix + i + ".jpg");
+                ) {
+                    bmps.get(i).compress(Bitmap.CompressFormat.JPEG, 100, os);
+                }
+            }
+        }
+    }
 
 }
