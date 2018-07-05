@@ -10,6 +10,9 @@ import io.reactivex.functions.Function;
 
 import static java.lang.Float.compare;
 
+/**
+ * Processing required to prepare inputs and interpret outputs from TinyYOLOv2.
+ */
 public class Yolo {
 
     private static final String TAG = "AS.Yolo";

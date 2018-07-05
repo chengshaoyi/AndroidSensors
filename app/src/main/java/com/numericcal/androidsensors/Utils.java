@@ -210,25 +210,7 @@ public class Utils {
     static int blue(int pix) { return (pix) & 0xFF; }
 
     /**
-     * Create a flowable transformer from pre-processing, processing, post-processing.
-     * @param processor - the actual work
-     * @param extractor - pre-processor
-     * @param combiner - post-processor
-     * @return
-     */
-    public static <F,R,Q,T> FlowableTransformer<F,T> mkFT(
-            Function<R,Q> processor, Function<F,R> extractor, BiFunction<F,Q,T> combiner) {
-        return upstream ->
-                upstream.onBackpressureBuffer(1, () -> Log.wtf(TAG, "dropping!"), BackpressureOverflowStrategy.DROP_OLDEST)
-                .map(input -> combiner.apply(input, processor.apply(extractor.apply(input))));
-    }
-
-    public static <F,T> FlowableTransformer<F,T> mkFT(Function<F,T> processor) {
-        return mkFT(processor, (F x) -> x, (__,y) -> y);
-    }
-
-    /**
-     * Create a flowable transformer from pre-processing, processing, post-processing.
+     * Create a transformer from pre-processing, processing, post-processing.
      * @param processor - the actual work
      * @param separator - pre-processor
      * @param combiner - post-processor
@@ -258,19 +240,19 @@ public class Utils {
     }
 
     /**
-     * A function with associated state.
+     * A function with local state.
      * @param <R>
      * @param <S>
      * @param <Q>
      */
-    public static abstract class Actor<R,S,Q> implements Function<R,Q> {
+    public static abstract class Agent<R,S,Q> implements Function<R,Q> {
         S state;
         @Override
         public abstract Q apply(R arg);
         public S finish() {
             return state;
         }
-        Actor(S init) {
+        Agent(S init) {
             this.state = init;
         }
     }
@@ -349,7 +331,7 @@ public class Utils {
     }
 
     /**
-     * Simple bitmap rotation.
+     * Bitmap rotation.
      * @param angle - clockwise angle to rotate.
      * @return rotated bitmap
      */
@@ -375,8 +357,8 @@ public class Utils {
      * @param discount - the pole of the IIR filter
      * @return filtered vector
      */
-    public static Utils.Actor<float[], float[], float[]> lpf(int vectorSize, float discount) {
-        return new Utils.Actor<float[], float[], float[]>(new float[vectorSize]) {
+    public static Utils.Agent<float[], float[], float[]> lpf(int vectorSize, float discount) {
+        return new Utils.Agent<float[], float[], float[]>(new float[vectorSize]) {
             @Override
             public float[] apply(float[] arg) {
                 float[] res = new float[vectorSize]; // result
@@ -396,9 +378,9 @@ public class Utils {
      * @param <T>
      * @return
      */
-    public static <T> Utils.Actor<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>
+    public static <T> Utils.Agent<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>
     lpfTT(float discount) {
-        return new Actor<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>(new ArrayList<>()) {
+        return new Agent<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>(new ArrayList<>()) {
             @Override
             public Pair<Tags.TTok<T>,List<Pair<String, Float>>> apply(Tags.TTok<T> arg) {
                 List<Float> filtered = new ArrayList<>();
@@ -473,6 +455,8 @@ public class Utils {
         return (long) (res * 1.05f);
     }
 
+    // experiment in sampling regulation
+    // ignore for now
     static void updateLatency(Long newLat, AtomicLong oldLat,
                               Long thresholdLat, BehaviorSubject<Long> ps) {
         Long currLat = oldLat.get();
@@ -491,8 +475,8 @@ public class Utils {
      * @param <T>
      * @return
      */
-    public static <T> Actor<T, List<T>, T> grabber(int lastN) {
-        return new Actor<T, List<T>, T>(new ArrayList<>(Collections.nCopies(lastN, null))) {
+    public static <T> Agent<T, List<T>, T> grabber(int lastN) {
+        return new Agent<T, List<T>, T>(new ArrayList<>(Collections.nCopies(lastN, null))) {
             int count = 0;
             @Override
             public T apply(T arg) {

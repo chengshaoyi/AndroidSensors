@@ -100,7 +100,7 @@ public class MainActivity extends AppCompatActivity {
                 .observeOn(AndroidSchedulers.mainThread())
                 .flatMapObservable(yolo -> {
 
-                    Utils.Actor<Bitmap, List<Bitmap>, Bitmap> frameGrabber = Utils.grabber(128);
+                    Utils.Agent<Bitmap, List<Bitmap>, Bitmap> frameGrabber = Utils.grabber(128);
 
                     /** BEGIN MODEL PARAM SECTION **/
                     int inputWidth = yolo.info.inputShape.get(1);
