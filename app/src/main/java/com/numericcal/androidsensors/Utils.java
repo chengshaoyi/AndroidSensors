@@ -378,11 +378,11 @@ public class Utils {
      * @param <T>
      * @return
      */
-    public static <T> Utils.Agent<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>
+    public static <T> Utils.Agent<Tags.TTok<T>, List<Float>, Pair<T,List<Pair<String, Float>>>>
     lpfTT(float discount) {
-        return new Agent<Tags.TTok<T>, List<Float>, Pair<Tags.TTok<T>,List<Pair<String, Float>>>>(new ArrayList<>()) {
+        return new Agent<Tags.TTok<T>, List<Float>, Pair<T,List<Pair<String, Float>>>>(new ArrayList<>()) {
             @Override
-            public Pair<Tags.TTok<T>,List<Pair<String, Float>>> apply(Tags.TTok<T> arg) {
+            public Pair<T,List<Pair<String, Float>>> apply(Tags.TTok<T> arg) {
                 List<Float> filtered = new ArrayList<>();
                 List<Long> diffs = diff(arg.md.exitTimes);
 
@@ -401,7 +401,7 @@ public class Utils {
 
                 state = filtered; // update state
 
-                return new Pair<>(arg, zip(merge(arg.md.tags, arg.md.threads), filtered));
+                return new Pair<>(arg.token, zip(merge(arg.md.tags, arg.md.threads), filtered));
             }
         };
     }

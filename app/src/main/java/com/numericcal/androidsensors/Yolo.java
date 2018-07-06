@@ -1,8 +1,12 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -16,6 +20,28 @@ import static java.lang.Float.compare;
 public class Yolo {
 
     private static final String TAG = "AS.Yolo";
+
+    public static class ModelParams {
+        public int S = 13;
+        public int C = 20;
+        public int B = 5;
+
+        public List<AnchorBox> anchors = new ArrayList<>();
+
+        public List<String> labels = Arrays.asList(
+                "aeroplane", "bicycle", "bird", "boat", "bottle",
+                "bus", "car", "cat", "chair", "cow",
+                "dining table", "dog", "horse", "motorbike", "person",
+                "potted plant", "sheep", "sofa", "train", "tv monitor");
+
+        ModelParams() {
+            anchors.add(new Yolo.AnchorBox(1.08f, 1.19f));
+            anchors.add(new Yolo.AnchorBox(3.42f, 4.41f));
+            anchors.add(new Yolo.AnchorBox(6.63f, 11.38f));
+            anchors.add(new Yolo.AnchorBox(9.42f, 5.11f));
+            anchors.add(new Yolo.AnchorBox(16.62f, 10.52f));
+        }
+    }
 
     /**
      * A class to represent all the boxes reported by a single cell.
@@ -133,7 +159,7 @@ public class Yolo {
      * @return
      */
     public static Function<List<CellBoxes>, List<BBox>> thresholdAndBox(
-            float threshold, List<AnchorBox> anchors, List<String> labels, float scaleW, float scaleH) {
+            float threshold, ModelParams mp, float scaleW, float scaleH) {
         return cbList -> {
             List<BBox> highConfidenceBoxes = new ArrayList<>();
 
@@ -154,7 +180,7 @@ public class Yolo {
                     float confidence = predictions[maxClass] * objectConfidence;
 
                     if (confidence > threshold) { // is confidence high enough?
-                        AnchorBox anchor = anchors.get(b);
+                        AnchorBox anchor = mp.anchors.get(b);
 
                         float tx = cb.arr[offset + 0];
                         float ty = cb.arr[offset + 1];
@@ -172,7 +198,7 @@ public class Yolo {
                         int bottom = (int) (centerY + roiH/2.0);
                         int top = (int) (centerY - roiH/2.0);
 
-                        highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, labels.get(maxClass), confidence));
+                        highConfidenceBoxes.add(new BBox(bottom, top, left, right, maxClass, mp.labels.get(maxClass), confidence));
                     }
                 }
             }
@@ -233,6 +259,24 @@ public class Yolo {
             }
 
             return boxes;
+        };
+    }
+
+    /**
+     * Draw boxes on a bitmap to be overlaid on top of the camera frame stream.
+     * @return
+     */
+    public static Function<List<BBox>, Bitmap> drawBBoxes(int w, int h, float scaleW, float scaleH) {
+        return bBoxes -> {
+            Bitmap boxBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            Canvas boxCanvas = new Canvas(boxBmp);
+
+            boxCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+            for (BBox bbox: bBoxes) {
+                Overlay.drawBox(rescaleBBoxBy(bbox, scaleW, scaleH), new Overlay.LineStyle(Color.GREEN, 2.0f), boxCanvas);
+            }
+
+            return boxBmp;
         };
     }
 
