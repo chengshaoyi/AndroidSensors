@@ -41,11 +41,6 @@ import static com.numericcal.androidsensors.Examples.YoloV2.yuv2bmpTT;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
 
-    // TODO: this should go into model parameters
-    private static final int IMAGE_MEAN = 128;
-    private static final float IMAGE_STD = 128.0f;
-    private static final int TOP_LABELS = 3;
-
     TextView statusText;
     TableLayout tableLayout;
     CameraView cameraView;
@@ -119,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
                             .compose(scaleTT(dnnInputWidth, dnnInputHeight))
                             .observeOn(Schedulers.computation())
                             // normalize and lay out in memory
-                            .compose(yoloV2Normalize())
+                            .compose(yoloV2Normalize(mp.inputMean, mp.inputStd))
                             .compose(handle.runInference(extract(), combine("inference")))
                             // pull out sub-tensors for each YOLOv2 cell
                             .compose(splitCellsTT(mp.S, mp.B, mp.C))

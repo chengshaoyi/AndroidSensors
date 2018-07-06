@@ -26,6 +26,9 @@ public class Yolo {
         public int C = 20;
         public int B = 5;
 
+        public int inputMean = 0;
+        public float inputStd = 256.0f;
+
         public List<AnchorBox> anchors = new ArrayList<>();
 
         public List<String> labels = Arrays.asList(
@@ -120,8 +123,8 @@ public class Yolo {
      * in NHWC.BGR order.
      * @return float[] representation of the input image
      */
-    public static Function<Bitmap, float[]> v2Normalize() {
-        return Utils.bmpToFloat_HWC_BGR(0, 255.0f);
+    public static Function<Bitmap, float[]> v2Normalize(int mean, float std) {
+        return Utils.bmpToFloat_HWC_BGR(mean, std);
     }
 
     /**

@@ -48,8 +48,8 @@ public class Examples {
         }
 
         public static ObservableTransformer<TTok<Bitmap>, TTok<float[]>>
-        yoloV2Normalize() {
-            return Utils.mkOT(Yolo.v2Normalize(), extract(), combine("normalize"));
+        yoloV2Normalize(int mean, float std) {
+            return Utils.mkOT(Yolo.v2Normalize(mean, std), extract(), combine("normalize"));
         }
 
         public static ObservableTransformer<TTok<float[]>, TTok<List<Yolo.CellBoxes>>>
