@@ -82,14 +82,21 @@ public class MainActivity extends AppCompatActivity {
         Observable<Tags.TTok<Bitmap>> stream = dnnManager.createHandle(Dnn.configBuilder
                 .fromAccount("MLDeployer")
                 .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
+                //.getModelFromCollection("tinyYOLOv2-tfMobile"))
                 .getModelFromCollection("ncclYOLO"))
+                //.getModelFromCollection("tinyYOLOv2-tfLite"))
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnSuccess(handle -> {
+                    statusText.setText(handle.info.engine);
+
+                })
                 //.getModelFromCollection("tinyYolo2LiteDeploy-by-MLDeployer"))
                 .flatMapObservable(handle -> {
 
                     int dnnInputWidth = handle.info.inputShape.get(1);
                     int dnnInputHeight = handle.info.inputShape.get(2);
 
-                    Yolo.ModelParams mp = new Yolo.ModelParams();
+                    Yolo.ModelParams mp = new Yolo.ModelParams(handle.info.params);
 
                     int canvasWidth = overlayView.getWidth();
                     int canvasHeight = overlayView.getHeight();
@@ -100,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
                     float modelScaleX = (float) dnnInputWidth / mp.S;
                     float modelScaleY = (float) dnnInputHeight / mp.S;
 
-                    Observable<Long> interval = Observable.interval(220L, TimeUnit.MILLISECONDS);
+                    Observable<Long> interval = Observable.interval(1000L, TimeUnit.MILLISECONDS);
 
                     return Camera.getFeed(this, cameraView, camPerm)
                             .sample(interval)
@@ -127,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
                 });
 
         // finally filter out TTok logs and display bitmap + timings in the UI
-        stream.compose(Utils.mkOT(Utils.lpfTT(0.90f)))
+        stream.compose(Utils.mkOT(Utils.lpfTT(0.5f)))
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
                 .subscribe(this::updateUI, err -> { err.printStackTrace(); });

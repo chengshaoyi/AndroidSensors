@@ -4,6 +4,10 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.util.Log;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,9 +26,9 @@ public class Yolo {
     private static final String TAG = "AS.Yolo";
 
     public static class ModelParams {
-        public int S = 13;
-        public int C = 20;
-        public int B = 5;
+        public int S;
+        public int C;
+        public int B;
 
         public int inputMean = 0;
         public float inputStd = 256.0f;
@@ -37,7 +41,14 @@ public class Yolo {
                 "dining table", "dog", "horse", "motorbike", "person",
                 "potted plant", "sheep", "sofa", "train", "tv monitor");
 
-        ModelParams() {
+        ModelParams(JSONObject json) throws JSONException {
+
+            Log.wtf(TAG, json.toString());
+
+            this.S = json.getInt("S");
+            this.C = json.getInt("C");
+            this.B = json.getInt("B");
+
             anchors.add(new Yolo.AnchorBox(1.08f, 1.19f));
             anchors.add(new Yolo.AnchorBox(3.42f, 4.41f));
             anchors.add(new Yolo.AnchorBox(6.63f, 11.38f));
@@ -156,7 +167,6 @@ public class Yolo {
      * Detect potential boxes above the given threshold. Repackage them by calculating their
      * detected class, confidence in that detection and their actual shapes.
      * @param threshold - minimum overal confidence to accept detection
-     * @param anchors - list of anchor box descriptions for this network (DNN parameter)
      * @param scaleW - width scaling for calculations based on image width vs cell width (DNN parameter)
      * @param scaleH - height scaling (DNN parameter)
      * @return
