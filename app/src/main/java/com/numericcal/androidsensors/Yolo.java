@@ -54,7 +54,6 @@ public class Yolo {
 
             for (String anchorStr: Utils.loadLines(hdl.loadHyperParamFile(
                     json.getString("anchors")))) {
-                Log.wtf(TAG, anchorStr);
                 this.anchors.add(AnchorBox.fromSpcSepFloats(anchorStr));
             }
         }
