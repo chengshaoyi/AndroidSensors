@@ -1,6 +1,7 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -24,6 +25,7 @@ import io.reactivex.schedulers.Schedulers;
 
 import com.numericcal.edge.Dnn;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -82,9 +84,9 @@ public class MainActivity extends AppCompatActivity {
         Observable<Tags.TTok<Bitmap>> stream = dnnManager.createHandle(Dnn.configBuilder
                 .fromAccount("MLDeployer")
                 .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
-                //.getModelFromCollection("tinyYOLOv2-tfMobile"))
-                .getModelFromCollection("ncclYOLO"))
-                //.getModelFromCollection("tinyYOLOv2-tfLite"))
+                //.getModel("tinyYOLOv2-tfMobile"))
+                //.getModel("ncclYOLO"))
+                .getModel("tinyYOLOv2-tfLite"))
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(handle -> {
                     statusText.setText(handle.info.engine);
@@ -96,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
                     int dnnInputWidth = handle.info.inputShape.get(1);
                     int dnnInputHeight = handle.info.inputShape.get(2);
 
-                    Yolo.ModelParams mp = new Yolo.ModelParams(handle.info.params);
+                    Yolo.ModelParams mp = new Yolo.ModelParams(handle);
 
                     int canvasWidth = overlayView.getWidth();
                     int canvasHeight = overlayView.getHeight();
@@ -107,15 +109,20 @@ public class MainActivity extends AppCompatActivity {
                     float modelScaleX = (float) dnnInputWidth / mp.S;
                     float modelScaleY = (float) dnnInputHeight / mp.S;
 
-                    Observable<Long> interval = Observable.interval(1000L, TimeUnit.MILLISECONDS);
+                    Observable<Long> interval = Observable.interval(750L, TimeUnit.MILLISECONDS);
+                    Observable<Bitmap> imgs = Observable.fromIterable(Files.loadFromAssets(this.getApplicationContext(), Arrays.asList("examples/person.jpg"), BitmapFactory::decodeStream));
 
-                    return Camera.getFeed(this, cameraView, camPerm)
+                    return Observable.interval(33L, TimeUnit.MILLISECONDS)
+                            .flatMap(__ -> {
+                                return imgs;
+                            })
+                            //Camera.getFeed(this, cameraView, camPerm)
                             .sample(interval)
                             // add thread/entry/exit time tagging
                             .map(Tags.srcTag("camera"))
                             .observeOn(Schedulers.computation())
                             // convert colorspace and rotate
-                            .compose(yuv2bmpTT()).compose(rotateTT(90.0f))
+                            //.compose(yuv2bmpTT()).compose(rotateTT(90.0f))
                             .observeOn(Schedulers.computation())
                             // resize bitmap to fit the DNN input tensor
                             .compose(scaleTT(dnnInputWidth, dnnInputHeight))

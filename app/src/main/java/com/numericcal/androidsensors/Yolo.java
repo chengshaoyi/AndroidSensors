@@ -6,9 +6,12 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.util.Log;
 
+import com.numericcal.edge.Dnn;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,13 +38,11 @@ public class Yolo {
 
         public List<AnchorBox> anchors = new ArrayList<>();
 
-        public List<String> labels = Arrays.asList(
-                "aeroplane", "bicycle", "bird", "boat", "bottle",
-                "bus", "car", "cat", "chair", "cow",
-                "dining table", "dog", "horse", "motorbike", "person",
-                "potted plant", "sheep", "sofa", "train", "tv monitor");
+        public List<String> labels;
 
-        ModelParams(JSONObject json) throws JSONException {
+        ModelParams(Dnn.Handle hdl) throws JSONException, IOException {
+
+            JSONObject json = hdl.info.params;
 
             Log.wtf(TAG, json.toString());
 
@@ -49,11 +50,13 @@ public class Yolo {
             this.C = json.getInt("C");
             this.B = json.getInt("B");
 
-            anchors.add(new Yolo.AnchorBox(1.08f, 1.19f));
-            anchors.add(new Yolo.AnchorBox(3.42f, 4.41f));
-            anchors.add(new Yolo.AnchorBox(6.63f, 11.38f));
-            anchors.add(new Yolo.AnchorBox(9.42f, 5.11f));
-            anchors.add(new Yolo.AnchorBox(16.62f, 10.52f));
+            this.labels = Utils.loadLines(hdl.loadHyperParamFile(json.getString("labels")));
+
+            for (String anchorStr: Utils.loadLines(hdl.loadHyperParamFile(
+                    json.getString("anchors")))) {
+                Log.wtf(TAG, anchorStr);
+                this.anchors.add(AnchorBox.fromSpcSepFloats(anchorStr));
+            }
         }
     }
 
@@ -126,6 +129,12 @@ public class Yolo {
         AnchorBox(float width, float height) {
             this.width = width;
             this.height = height;
+        }
+
+        static AnchorBox fromSpcSepFloats(String ssf) {
+            String[] fs = ssf.split(" ");
+
+            return new AnchorBox(Float.parseFloat(fs[0]), Float.parseFloat(fs[1]));
         }
     }
 

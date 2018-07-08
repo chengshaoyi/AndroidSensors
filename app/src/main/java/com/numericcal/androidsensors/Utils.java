@@ -6,14 +6,18 @@ import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
+import android.renderscript.ScriptGroup;
 import android.util.Log;
 import android.util.Pair;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -511,6 +515,16 @@ public class Utils {
                 }
             }
         }
+    }
+
+    static List<String> loadLines(InputStream is) throws IOException {
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(is));
+        List<String> res = new ArrayList<String>();
+        String line;
+        while ((line = bufferedReader.readLine()) != null) {
+            res.add(line);
+        }
+        return res;
     }
 
 }
