@@ -294,7 +294,9 @@ public class Yolo {
 
             boxCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
             for (BBox bbox: bBoxes) {
-                Overlay.drawBox(rescaleBBoxBy(bbox, scaleW, scaleH), new Overlay.LineStyle(Color.GREEN, 2.0f), boxCanvas);
+                Overlay.drawBox(rescaleBBoxBy(bbox, scaleW, scaleH),
+                        new Overlay.LineStyle(Color.GREEN, 2.0f), boxCanvas);
+                //Log.wtf(TAG, bbox.toString());
             }
 
             return boxBmp;

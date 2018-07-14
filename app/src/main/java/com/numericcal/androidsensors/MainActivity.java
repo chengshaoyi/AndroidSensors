@@ -12,6 +12,7 @@ import android.widget.TableLayout;
 import android.widget.TableRow;
 import android.widget.TextView;
 
+import com.jakewharton.rxbinding2.view.RxView;
 import com.tbruyelle.rxpermissions2.RxPermissions;
 import com.uber.autodispose.AutoDispose;
 import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
@@ -19,26 +20,16 @@ import com.uber.autodispose.android.lifecycle.AndroidLifecycleScopeProvider;
 import io.fotoapparat.view.CameraView;
 import io.reactivex.Completable;
 import io.reactivex.Observable;
+import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
-
-import io.reactivex.schedulers.Schedulers;
 
 import com.numericcal.edge.Dnn;
 
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static com.numericcal.androidsensors.Examples.YoloV2.drawBBoxes;
-import static com.numericcal.androidsensors.Examples.YoloV2.splitCellsTT;
-import static com.numericcal.androidsensors.Examples.YoloV2.suppressNonMax;
-import static com.numericcal.androidsensors.Examples.YoloV2.thresholdBoxesTT;
-import static com.numericcal.androidsensors.Tags.combine;
-import static com.numericcal.androidsensors.Tags.extract;
-import static com.numericcal.androidsensors.Examples.YoloV2.rotateTT;
-import static com.numericcal.androidsensors.Examples.YoloV2.scaleTT;
-import static com.numericcal.androidsensors.Examples.YoloV2.yoloV2Normalize;
-import static com.numericcal.androidsensors.Examples.YoloV2.yuv2bmpTT;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "AS.Main";
@@ -79,69 +70,39 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
+        List<String> files = Files.getAssetFileNames(this.getApplicationContext(),
+                "examples/vid", "jpg");
+        Collections.sort(files);
+        List<Bitmap> bmps = Files.loadFromAssets(
+                this.getApplicationContext(), files, BitmapFactory::decodeStream);
+        Observable<Bitmap> frames = Observable.interval(40L, TimeUnit.MILLISECONDS)
+                .map(idx -> {
+                    return bmps.get(idx.intValue() % bmps.size());
+                }); // cycle given frames at period (per frame)
+
+        // display frames
+        frames.observeOn(AndroidSchedulers.mainThread())
+                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
+                .subscribe(overlayView::setImageBitmap);
+
         dnnManager = Dnn.createManager(getApplicationContext());
 
-        Observable<Tags.TTok<Bitmap>> stream = dnnManager.createHandle(Dnn.configBuilder
+        Single<Dnn.Handle> yolo = dnnManager.createHandle(Dnn.configBuilder
                 .fromAccount("MLDeployer")
                 .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
                 //.getModel("tinyYOLOv2-tfMobile"))
                 //.getModel("ncclYOLO"))
-                .getModel("tinyYOLOv2-tfLite"))
+                .getModel("tinyYoloDep-by-MLDeployer"))
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(handle -> {
                     statusText.setText(handle.info.engine);
-
-                })
-                //.getModelFromCollection("tinyYolo2LiteDeploy-by-MLDeployer"))
-                .flatMapObservable(handle -> {
-
-                    int dnnInputWidth = handle.info.inputShape.get(1);
-                    int dnnInputHeight = handle.info.inputShape.get(2);
-
-                    Yolo.ModelParams mp = new Yolo.ModelParams(handle);
-
-                    int canvasWidth = overlayView.getWidth();
-                    int canvasHeight = overlayView.getHeight();
-
-                    float drawScaleW = (float) canvasWidth / dnnInputWidth;
-                    float drawScaleH = (float) canvasHeight / dnnInputHeight;
-
-                    float modelScaleX = (float) dnnInputWidth / mp.S;
-                    float modelScaleY = (float) dnnInputHeight / mp.S;
-
-                    Observable<Long> interval = Observable.interval(750L, TimeUnit.MILLISECONDS);
-                    Observable<Bitmap> imgs = Observable.fromIterable(Files.loadFromAssets(this.getApplicationContext(), Arrays.asList("examples/person.jpg"), BitmapFactory::decodeStream));
-
-                    return Observable.interval(33L, TimeUnit.MILLISECONDS)
-                            .flatMap(__ -> {
-                                return imgs;
-                            })
-                            //Camera.getFeed(this, cameraView, camPerm)
-                            .sample(interval)
-                            // add thread/entry/exit time tagging
-                            .map(Tags.srcTag("camera"))
-                            .observeOn(Schedulers.computation())
-                            // convert colorspace and rotate
-                            //.compose(yuv2bmpTT()).compose(rotateTT(90.0f))
-                            .observeOn(Schedulers.computation())
-                            // resize bitmap to fit the DNN input tensor
-                            .compose(scaleTT(dnnInputWidth, dnnInputHeight))
-                            .observeOn(Schedulers.computation())
-                            // normalize and lay out in memory
-                            .compose(yoloV2Normalize(mp.inputMean, mp.inputStd))
-                            .compose(handle.runInference(extract(), combine("inference")))
-                            // pull out sub-tensors for each YOLOv2 cell
-                            .compose(splitCellsTT(mp.S, mp.B, mp.C))
-                            // pull out high-confidence boxes in each cell
-                            .compose(thresholdBoxesTT(0.3f, mp, modelScaleX, modelScaleY))
-                            // remove overlapping boxes
-                            .compose(suppressNonMax(0.3f))
-                            // create bounding box overlay bitmap
-                            .compose(drawBBoxes(canvasWidth, canvasHeight, drawScaleW, drawScaleH));
                 });
 
+        Observable<Tags.TTok<Bitmap>> boxStream = Examples.YoloV2.demo(
+                yolo, 1000L, frames, extraOverlay);
+
         // finally filter out TTok logs and display bitmap + timings in the UI
-        stream.compose(Utils.mkOT(Utils.lpfTT(0.5f)))
+        boxStream.compose(Utils.mkOT(Utils.lpfTT(0.5f)))
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
                 .subscribe(this::updateUI, err -> { err.printStackTrace(); });
@@ -149,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private <T> void updateUI(Pair<Bitmap,List<Pair<String, Float>>> report) {
-        overlayView.setImageBitmap(report.first);
+        extraOverlay.setImageBitmap(report.first);
 
         int cnt = 0;
         tableLayout.removeAllViews();

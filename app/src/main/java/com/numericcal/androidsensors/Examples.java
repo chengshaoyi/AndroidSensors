@@ -1,20 +1,19 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.PorterDuff;
-import android.util.Log;
 import android.widget.ImageView;
 
 import io.fotoapparat.preview.Frame;
+import io.reactivex.Observable;
 import io.reactivex.ObservableTransformer;
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
 
 import com.numericcal.androidsensors.Tags.TTok;
+import com.numericcal.edge.Dnn;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.numericcal.androidsensors.Tags.combine;
 import static com.numericcal.androidsensors.Tags.extract;
@@ -26,6 +25,50 @@ public class Examples {
 
     public static class YoloV2 {
         private static final String TAG = "Ex.YoloV2";
+
+        public static Observable<TTok<Bitmap>> demo(
+                Single<Dnn.Handle> yolo, Long samplingInterval, Observable<Bitmap> inStream, ImageView imgView) {
+
+            return yolo.flatMapObservable(handle -> {
+                int dnnInputWidth = handle.info.inputShape.get(1);
+                int dnnInputHeight = handle.info.inputShape.get(2);
+
+                Yolo.ModelParams mp = new Yolo.ModelParams(handle);
+
+                // note: there is a race here, but DNN loading always loses to ImageView layout
+                float drawScaleW = (float) imgView.getWidth() / dnnInputWidth;
+                float drawScaleH = (float) imgView.getHeight() / dnnInputHeight;
+
+                float modelScaleX = (float) dnnInputWidth / mp.S;
+                float modelScaleY = (float) dnnInputHeight / mp.S;
+
+                Observable<Long> interval = Observable.interval(samplingInterval, TimeUnit.MILLISECONDS);
+
+                return inStream
+                        //Camera.getFeed(this, cameraView, camPerm)
+                        .sample(interval)
+                        // add thread/entry/exit time tagging
+                        .map(Tags.srcTag("camera"))
+                        .observeOn(Schedulers.computation())
+                        // convert colorspace and rotate
+                        //.compose(yuv2bmpTT()).compose(rotateTT(90.0f))
+                        .observeOn(Schedulers.computation())
+                        // resize bitmap to fit the DNN input tensor
+                        .compose(scaleTT(dnnInputWidth, dnnInputHeight))
+                        .observeOn(Schedulers.computation())
+                        // normalize and lay out in memory
+                        .compose(yoloV2Normalize(mp.inputMean, mp.inputStd))
+                        .compose(handle.runInference(extract(), combine("inference")))
+                        // pull out sub-tensors for each YOLOv2 cell
+                        .compose(splitCellsTT(mp.S, mp.B, mp.C))
+                        // pull out high-confidence boxes in each cell
+                        .compose(thresholdBoxesTT(0.3f, mp, modelScaleX, modelScaleY))
+                        // remove overlapping boxes
+                        .compose(suppressNonMax(0.3f))
+                        // create bounding box overlay bitmap
+                        .compose(drawBBoxes(imgView.getWidth(), imgView.getHeight(), drawScaleW, drawScaleH));
+            });
+        }
 
         public static ObservableTransformer<TTok<Frame>, TTok<Bitmap>>
         yuv2bmpTT() {

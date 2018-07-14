@@ -27,19 +27,21 @@ public class Files {
      * @param suffix - suffix of files we're interested in
      * @return a list of file names
      */
-    private static List<String> getAssetFileNames(Context ctx, String dir, String suffix) {
+    public static List<String> getAssetFileNames(Context ctx, String dir, String suffix) {
         List <String> samples = new ArrayList<>();
 
         try {
+
             for (String fname: ctx.getAssets().list(dir)) {
-                if (fname.endsWith(dir + "/" + suffix)) {
-                    samples.add(fname);
+                if (fname.endsWith(suffix)) {
+                    samples.add(dir + "/" + fname);
                 }
             }
         } catch (IOException ioex) {
             Log.i(TAG, "No exaple " + suffix + " files.");
         }
 
+        Log.wtf(TAG, "" + samples.size());
         return samples;
     }
 
@@ -50,7 +52,7 @@ public class Files {
      * @param suffix - file suffix to list
      * @return
      */
-    private static List<String> getFilesysFileNames(Context ctx, String dir, String suffix) {
+    public static List<String> getFilesysFileNames(Context ctx, String dir, String suffix) {
         List<String> samples = new ArrayList<>();
         String filesDir = ctx.getApplicationContext().getFilesDir().toString();
         File fdir = new File(filesDir + "/" + dir + "/");
