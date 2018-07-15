@@ -27,7 +27,7 @@ public class Examples {
         private static final String TAG = "Ex.YoloV2";
 
         public static Observable<TTok<Bitmap>> demo(
-                Single<Dnn.Handle> yolo, Long samplingInterval, Observable<Bitmap> inStream, ImageView imgView) {
+                Single<Dnn.Handle> yolo, Observable<Bitmap> inStream, ImageView imgView) {
 
             return yolo.flatMapObservable(handle -> {
                 int dnnInputWidth = handle.info.inputShape.get(1);
@@ -42,16 +42,10 @@ public class Examples {
                 float modelScaleX = (float) dnnInputWidth / mp.S;
                 float modelScaleY = (float) dnnInputHeight / mp.S;
 
-                Observable<Long> interval = Observable.interval(samplingInterval, TimeUnit.MILLISECONDS);
-
                 return inStream
                         //Camera.getFeed(this, cameraView, camPerm)
-                        .sample(interval)
                         // add thread/entry/exit time tagging
-                        .map(Tags.srcTag("camera"))
-                        .observeOn(Schedulers.computation())
-                        // convert colorspace and rotate
-                        //.compose(yuv2bmpTT()).compose(rotateTT(90.0f))
+                        .map(Tags.srcTag("source"))
                         .observeOn(Schedulers.computation())
                         // resize bitmap to fit the DNN input tensor
                         .compose(scaleTT(dnnInputWidth, dnnInputHeight))

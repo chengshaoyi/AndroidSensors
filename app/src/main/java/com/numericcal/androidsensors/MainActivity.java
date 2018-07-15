@@ -70,42 +70,51 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        List<String> files = Files.getAssetFileNames(this.getApplicationContext(),
-                "examples/vid", "jpg");
-        Collections.sort(files);
-        List<Bitmap> bmps = Files.loadFromAssets(
-                this.getApplicationContext(), files, BitmapFactory::decodeStream);
-        Observable<Bitmap> frames = Observable.interval(40L, TimeUnit.MILLISECONDS)
-                .map(idx -> {
-                    return bmps.get(idx.intValue() % bmps.size());
-                }); // cycle given frames at period (per frame)
-
-        // display frames
-        frames.observeOn(AndroidSchedulers.mainThread())
-                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
-                .subscribe(overlayView::setImageBitmap);
-
+        // set up numericcal DNN manager
         dnnManager = Dnn.createManager(getApplicationContext());
 
+        // request a network
         Single<Dnn.Handle> yolo = dnnManager.createHandle(Dnn.configBuilder
                 .fromAccount("MLDeployer")
                 .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
-                //.getModel("tinyYOLOv2-tfMobile"))
-                //.getModel("ncclYOLO"))
                 .getModel("tinyYoloDep-by-MLDeployer"))
+                // & display some info in the UI
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(handle -> {
                     statusText.setText(handle.info.engine);
                 });
 
-        Observable<Tags.TTok<Bitmap>> boxStream = Examples.YoloV2.demo(
-                yolo, 1000L, frames, extraOverlay);
+        Observable<Bitmap> frames = yolo
+                .flatMapObservable(__ -> {
+                    // source stream cycles through .jpg files in assets/examples
+                    // we do it here to make sure input stream starts after DNN is ready
+                    List<String> files = Files.getAssetFileNames(this.getApplicationContext(),
+                            "examples", "jpg");
+                    List<Bitmap> bmps = Files.loadFromAssets(
+                            this.getApplicationContext(), files, BitmapFactory::decodeStream);
 
-        // finally filter out TTok logs and display bitmap + timings in the UI
+                    return Observable.interval(4000L, TimeUnit.MILLISECONDS)
+                            .map(idx -> bmps.get(idx.intValue() % bmps.size()));
+                });
+
+        // display frames
+        frames.observeOn(AndroidSchedulers.mainThread())
+                .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
+                .subscribe(bmp -> {
+                    // set the new image
+                    overlayView.setImageBitmap(bmp);
+                    // clear the box overlay
+                    extraOverlay.setImageResource(android.R.color.transparent);
+                });
+
+        // set up the DNN processing
+        Observable<Tags.TTok<Bitmap>> boxStream = Examples.YoloV2.demo(yolo, frames, extraOverlay);
+
+        // finally filter out TTok logs and display boxes + timings in the UI
         boxStream.compose(Utils.mkOT(Utils.lpfTT(0.5f)))
                 .observeOn(AndroidSchedulers.mainThread())
                 .as(AutoDispose.autoDisposable(AndroidLifecycleScopeProvider.from(this)))
-                .subscribe(this::updateUI, err -> { err.printStackTrace(); });
+                .subscribe(this::updateUI, Throwable::printStackTrace );
 
     }
 
