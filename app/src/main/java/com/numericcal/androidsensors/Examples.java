@@ -30,6 +30,19 @@ public class Examples {
                 Single<Dnn.Handle> yolo, Observable<Bitmap> inStream, ImageView imgView) {
 
             return yolo.flatMapObservable(handle -> {
+
+                /*
+                 * Once we have the handle we can access the hyperparameters. For example,
+                 * TinyYOLOv2 model was packaged with S (number of cells), B (boxes per cell) and
+                 * C (classes predicted per box) among other parameters. Packaging guarantees
+                 * that these parameters will be present in the `info` field of the handle.
+                 *
+                 * However, by design, values of these fields are not guaranteed. This creates
+                 * an abstraction barrier between the software devs and ML engineers. It forces
+                 * software devs to accommodate all possible values for these params, which
+                 * enables ML engineers to update the model in a flexible way without requiring
+                 * software changes.
+                 */
                 int dnnInputWidth = handle.info.inputShape.get(1);
                 int dnnInputHeight = handle.info.inputShape.get(2);
 

@@ -30,7 +30,7 @@ public class Overlay {
         canvas.drawLine(box.right, box.top, box.left, box.top, paint);
 
         paint.setTextSize(30.0f);
-        canvas.drawText(String.format("%-15s @ %10.2f", box.label, box.confidence), box.left, box.top, paint);
+        canvas.drawText(String.format("%s @ %.2f", box.label, box.confidence), box.left, box.top, paint);
 
     }
 }
