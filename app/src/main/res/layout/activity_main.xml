@@ -53,7 +53,7 @@
             android:id="@+id/statusText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Debug info" />
+            android:text="Downloading DNNs can take a bit on slow connections ..." />
 
         <TableLayout
             android:id="@+id/tableLayout"
