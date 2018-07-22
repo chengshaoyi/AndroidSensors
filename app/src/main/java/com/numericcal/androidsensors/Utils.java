@@ -318,6 +318,44 @@ public class Utils {
         };
     }
 
+
+    /**
+     * Turn a Bitmap into HWC.BGR float buffer.
+
+     * @return float array flowable
+     */
+    public static Function<Bitmap, float[]> bmpToFloat_HWC_RGB() {
+        return bmp -> {
+            int height = bmp.getHeight();
+            int width = bmp.getWidth();
+            int size = height * width;
+
+            int[] ibuff = new int[size];
+            float[] fbuff = new float[3 * size]; // rgb, each a float
+            //Log.d(TAG,"height "+height+ "; width:"+width);
+            //int elementInd = (70*width+160);
+            bmp.getPixels(ibuff, 0, width, 0, 0, width, height);
+
+            for (int i = 0; i < ibuff.length; i++) {
+
+                int val = ibuff[i];
+                fbuff[i * 3 + 0] = red(val);//(blue(val) - mean) / std;
+                fbuff[i * 3 + 1] = green(val);// - mean) / std;
+                fbuff[i * 3 + 2] = blue(val);// - mean) / std;
+                /*if(i == elementInd)
+                {
+                    Log.d(TAG,"value: "+fbuff[i * 3 + 0]+ ";"+fbuff[i * 3 + 1]+";"+fbuff[i * 3 + 2]);
+                }*/
+            }
+
+            return fbuff;
+        };
+    }
+
+
+
+
+
     /**
      * Convert YUV NV21 to Bitmap. Fotoapparat will produce NV21 but we need Bitmap for DNN.
      * @return new bitmap flowable

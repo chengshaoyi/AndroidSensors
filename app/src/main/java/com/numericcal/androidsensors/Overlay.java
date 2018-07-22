@@ -33,4 +33,21 @@ public class Overlay {
         canvas.drawText(String.format("%s @ %.2f", box.label, box.confidence), box.left, box.top, paint);
 
     }
+    public static void drawBox(FaceDet.BBox box, LineStyle line, Canvas canvas) {
+        Paint paint = new Paint();
+
+        paint.setColor(line.color);
+        paint.setAntiAlias(true);
+        paint.setStrokeWidth(line.width);
+
+        canvas.drawLine(box.left, box.bottom, box.left, box.top, paint);
+        canvas.drawLine(box.left, box.bottom, box.right, box.bottom, paint);
+        canvas.drawLine(box.right, box.top, box.right, box.bottom, paint);
+        canvas.drawLine(box.right, box.top, box.left, box.top, paint);
+
+        paint.setTextSize(30.0f);
+        canvas.drawText(String.format("%s @ %.2f", "face", box.confidence), box.left, box.top, paint);
+
+    }
+
 }

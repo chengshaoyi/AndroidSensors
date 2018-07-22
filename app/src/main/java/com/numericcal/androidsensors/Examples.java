@@ -1,6 +1,7 @@
 package com.numericcal.androidsensors;
 
 import android.graphics.Bitmap;
+import android.util.Log;
 import android.widget.ImageView;
 
 import io.fotoapparat.preview.Frame;
@@ -124,5 +125,93 @@ public class Examples {
         }
 
     }
+
+
+
+
+    public static class MobileSSDFaceDet {
+        private static final String TAG = "Ex.FaceDet";
+
+        public static Observable<TTok<Bitmap>> demo(
+                Single<Dnn.Handle> faceDet, Observable<Bitmap> inStream, ImageView imgView) {
+
+            return faceDet.flatMapObservable(handle -> {
+
+
+                int dnnInputWidth = handle.info.inputShape.get(2);
+                int dnnInputHeight = handle.info.inputShape.get(1);
+                Log.d(TAG,"h: "+dnnInputHeight+" w: "+dnnInputWidth);
+                FaceDet.ModelParams mp = new FaceDet.ModelParams(handle);
+
+                // note: there is a race here, but DNN loading always loses to ImageView layout
+                float drawScaleW = (float) imgView.getWidth() / dnnInputWidth;
+                float drawScaleH = (float) imgView.getHeight() / dnnInputHeight;
+
+               // float modelScaleX = (float) dnnInputWidth / mp.S;
+                //float modelScaleY = (float) dnnInputHeight / mp.S;
+
+                return inStream
+                        //Camera.getFeed(this, cameraView, camPerm)
+                        // add thread/entry/exit time tagging
+                        .map(Tags.srcTag("source"))
+                        .observeOn(Schedulers.computation())
+                        // resize bitmap to fit the DNN input tensor
+                        .compose(scaleTT(dnnInputWidth, dnnInputHeight))
+                        .observeOn(Schedulers.computation())
+                        // normalize and lay out in memory
+                        .compose(faceDetNormalize())
+                        .compose(handle.runInference(extract(), combine("inference")))
+                        // create bounding boxes
+                        .compose(parseBoundingBoxesScores(mp.max_num_boxes,dnnInputHeight,dnnInputWidth))
+                        // pull out high-confidence boxes in each cell
+                        //.compose(thresholdBoxesTT(0.7f, mp))
+                        // remove overlapping boxes
+                        //.compose(suppressNonMax(0.3f))
+                        // create bounding box overlay bitmap
+                        .compose(drawBBoxes(imgView.getWidth(), imgView.getHeight(), drawScaleW, drawScaleH));
+            });
+        }
+
+        /*public static ObservableTransformer<TTok<Frame>, TTok<Bitmap>>
+        yuv2bmpTT() {
+            return Utils.mkOT(Utils.yuv2bmp(), extract(), combine("yuv2bmp"));
+        }*/
+
+        public static ObservableTransformer<TTok<Bitmap>, TTok<Bitmap>>
+        rotateTT(float angle) {
+            return Utils.mkOT(Utils.bmpRotate(angle), extract(), combine("rotate"));
+        }
+
+        public static ObservableTransformer<TTok<Bitmap>, TTok<Bitmap>>
+        scaleTT(int width, int height) {
+            return Utils.mkOT(Camera.scaleTo(width, height), extract(), combine("scaling"));
+        }
+
+        /*public static <F,S,T> ObservableTransformer<TTok<F>,TTok<T>>
+        valueGrabTT(Utils.Agent<F,S,T> actorGrabber) {
+            return Utils.mkOT(actorGrabber, extract(), combine("grabber"));
+        }*/
+
+        public static ObservableTransformer<TTok<Bitmap>, TTok<float[]>>
+        faceDetNormalize() {
+            return Utils.mkOT(Utils.bmpToFloat_HWC_RGB(), extract(), combine("normalize"));
+        }
+
+        public static ObservableTransformer<TTok<float[]>, TTok<List<FaceDet.BBox>>>
+        parseBoundingBoxesScores(int max_num_faces,int height,int width) {
+            return Utils.mkOT(FaceDet.makeBoundingBoxesScores(max_num_faces,height,width), extract(), combine("box forming"));
+        }
+
+
+
+        public static ObservableTransformer<TTok<List<FaceDet.BBox>>, TTok<Bitmap>>
+        drawBBoxes(int w, int h, float scaleW, float scaleH) {
+            return Utils.mkOT(FaceDet.drawBBoxes(w, h, scaleW, scaleH), extract(), combine("bboxes"));
+        }
+
+    }
+
+
+
 
 }

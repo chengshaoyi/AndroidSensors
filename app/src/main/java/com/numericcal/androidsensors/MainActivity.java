@@ -74,17 +74,17 @@ public class MainActivity extends AppCompatActivity {
         dnnManager = Dnn.createManager(getApplicationContext());
 
         // request a network
-        Single<Dnn.Handle> yolo = dnnManager.createHandle(Dnn.configBuilder
+        Single<Dnn.Handle> faceDet = dnnManager.createHandle(Dnn.configBuilder
                 .fromAccount("MLDeployer")
                 .withAuthToken("41fa5c144a7f7323cfeba5d2416aeac3")
-                .getModel("tinyYoloDep-by-MLDeployer"))
+                .getModel("faceDetector-by-MLDeployer"))
                 // & display some info in the UI
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(handle -> {
                     statusText.setText(handle.info.engine);
                 });
 
-        Observable<Bitmap> frames = yolo
+        Observable<Bitmap> frames = faceDet
                 .flatMapObservable(__ -> {
                     // source stream cycles through .jpg files in assets/examples
                     // we do it here to make sure input stream starts after DNN is ready
@@ -108,7 +108,10 @@ public class MainActivity extends AppCompatActivity {
                 });
 
         // set up the DNN processing
-        Observable<Tags.TTok<Bitmap>> boxStream = Examples.YoloV2.demo(yolo, frames, extraOverlay);
+        Observable<Tags.TTok<Bitmap>> boxStream = Examples.MobileSSDFaceDet.demo(faceDet, frames, extraOverlay);
+
+
+
 
         // finally filter out TTok logs and display boxes + timings in the UI
         boxStream.compose(Utils.mkOT(Utils.lpfTT(0.5f)))
